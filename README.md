@@ -6,10 +6,10 @@ ____________
 
 Nome dos integrantes: 
 
-* pessoa 1
-* pessoa 2
-* pessoa 3
-* pessoa 4
+* Bernardo Cunha Capoferri  
+* Guiherme Dantas Rameh
+* Henrique Martinelli Frezzatti 
+* Lívia Sayuri Makuta
 
 
 Visite sempre o enunciado abaixo para atualizacões: 
