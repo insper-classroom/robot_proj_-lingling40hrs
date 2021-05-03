@@ -25,6 +25,7 @@ print("wget https://github.com/Insper/robot21.1/raw/main/projeto/ros_projeto/scr
 print("PARA TER OS PESOS DA REDE NEURAL")
 
 import visao_module
+import regressaoLinear as rl
 
 
 bridge = CvBridge()
@@ -64,6 +65,7 @@ def roda_todo_frame(imagem):
     global media
     global centro
     global resultados
+    global coef_angular
 
     now = rospy.get_rostime()
     imgtime = imagem.header.stamp
@@ -85,9 +87,17 @@ def roda_todo_frame(imagem):
             # o resultado            
             pass
 
-        # Desnecessário - Hough e MobileNet já abrem janelas
         cv_image = saida_net.copy()
+        bgr = cv_image.copy()
+        hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
+
+        mask_yellow = segmenta_linha_amarela_bgr(bgr, low_yellow, high_yellow)
+        mask_yellow = morpho_limpa(mask_yellow)
+        output, coef_angular, x = ajuste_linear_grafico_x_fy(mask_yellow)
+
+        # Desnecessário - Hough e MobileNet já abrem janelas
         cv2.imshow("cv_image", cv_image)
+        cv2.imshow("Output", output)
         cv2.waitKey(1)
     except CvBridgeError as e:
         print('ex', e)
@@ -114,7 +124,36 @@ if __name__=="__main__":
         while not rospy.is_shutdown():
             for r in resultados:
                 print(r)
-            
+            v = 0
+            w = 0
+            if -0.2 <= coef_angular <= 0.2:
+                v = 0.1
+                w = 0
+            elif coef_angular > 0.2:
+                if 300 < x[1] < 360:
+                    v = 0.05
+                    w = 0.05
+                elif x[1] > 360:
+                    v = 0.05
+                    w = -0.07
+                else:
+                    v = 0.05
+                    w = 0.07
+            elif coef_angular < -0.2:
+                if 300 < x[0] < 360:
+                    v = 0.05
+                    w = -0.05
+                elif x[0] > 480:
+                    v = 0.05
+                    w = -0.07
+                else:
+                    v = 0.05
+                    w = 0.07
+            else:
+                v = 0
+                w = 0
+                
+            vel = Twist(Vector3(v,0,0), Vector3(0,0,w))
             velocidade_saida.publish(vel)
             rospy.sleep(0.1)
 
