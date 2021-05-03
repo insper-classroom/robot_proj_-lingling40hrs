@@ -33,6 +33,7 @@ bridge = CvBridge()
 cv_image = None
 media = []
 centro = []
+x = []
 atraso = 1.5E9 # 1 segundo e meio. Em nanossegundos
 
 
@@ -48,6 +49,7 @@ x = 0
 y = 0
 z = 0 
 id = 0
+coef_angular = 0
 
 frame = "camera_link"
 # frame = "head_camera"  # DESCOMENTE para usar com webcam USB via roslaunch tag_tracking usbcam
@@ -66,6 +68,7 @@ def roda_todo_frame(imagem):
     global centro
     global resultados
     global coef_angular
+    global x
 
     now = rospy.get_rostime()
     imgtime = imagem.header.stamp
@@ -91,9 +94,10 @@ def roda_todo_frame(imagem):
         bgr = cv_image.copy()
         hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
 
-        mask_yellow = segmenta_linha_amarela_bgr(bgr, low_yellow, high_yellow)
-        mask_yellow = morpho_limpa(mask_yellow)
-        output, coef_angular, x = ajuste_linear_grafico_x_fy(mask_yellow)
+        mask_yellow = rl.segmenta_linha_amarela_bgr(bgr)
+        mask_yellow = rl.morpho_limpa(mask_yellow)
+        output, coef_angular, x = rl.ajuste_linear_grafico_x_fy(mask_yellow)
+        print(x)
 
         # Desnecessário - Hough e MobileNet já abrem janelas
         cv2.imshow("cv_image", cv_image)

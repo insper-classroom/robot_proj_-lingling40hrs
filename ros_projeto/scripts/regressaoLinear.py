@@ -1,3 +1,10 @@
+import numpy as np
+import math
+import cv2
+import statsmodels.api as sm
+from sklearn.linear_model import LinearRegression
+
+
 def morpho_limpa(mask):
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(6,6))
     mask = cv2.morphologyEx( mask, cv2.MORPH_OPEN, kernel )
