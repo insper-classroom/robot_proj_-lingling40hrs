@@ -87,6 +87,14 @@ def ajuste_linear_x_fy(mask):
     coef_linear =  results.params[0] # Pegamso o beta 0
     return coef_angular, coef_linear
 
+def maskYellowBloqueiaDireita(mask):
+    mask = cv2.rectangle(mask, (450,0), (720,480), (0,0,0), -1)
+    return mask
+    
+def maskYellowBloqueiaEsquerda(mask):
+    mask = cv2.rectangle(mask, (0,0), (80,480), (0,0,0), -1)
+    return mask
+
 def ajuste_linear(mask):
     """Recebe uma imagem já limiarizada e faz um ajuste linear
         retorna coeficientes linear e angular da reta
