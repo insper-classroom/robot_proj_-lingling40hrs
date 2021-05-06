@@ -78,14 +78,19 @@ y = 0
 z = 0 
 id = 0
 coef_angular = 0
+laserDado = 10.0
+distancenp = 0
+angle_z = 0.0
+angulo_local = 1000
 
 # aqui estão todos os estados usados pelo robô.
 LINHA = 0
 CIRCUNF = 1
 DIREITA = 2
 ESQUERDA = 3
-GIRO = 4
-ESTADO = CIRCUNF
+GIRO90 = 4
+GIRO180 = 5
+ESTADO = LINHA
 
 frame = "camera_link"
 # frame = "head_camera"  # DESCOMENTE para usar com webcam USB via roslaunch tag_tracking usbcam
@@ -94,17 +99,40 @@ tfl = 0
 
 tf_buffer = tf2_ros.Buffer()
 
-laserDado = 10.0
-
 def scaneou(dado):
-    print("Faixa valida: ", dado.range_min , " - ", dado.range_max )
-    print("Leituras:")
-    print(np.array(dado.ranges).round(decimals=2))
+    #print("Faixa valida: ", dado.range_min , " - ", dado.range_max )
+    #print("Leituras:")
+    #print(np.array(dado.ranges).round(decimals=2))
     global laserDado
     laserDado = dado.ranges[90]
     #print("Intensities")
     #print(np.array(dado.intensities).round(decimals=2))
 
+def recebe_odometria(data):
+    global x
+    global y
+    global contador
+    global angle_z
+
+    x = data.pose.pose.position.x
+    y = data.pose.pose.position.y
+
+    quat = data.pose.pose.orientation
+    lista = [quat.x, quat.y, quat.z, quat.w]
+    radianos = transformations.euler_from_quaternion(lista)
+    angle_z = radianos[2]
+    angulos = np.degrees(radianos)    
+
+    if contador % pula == 0:
+        print("Posicao (x,y)  ({:.2f} , {:.2f}) + angulo {:.2f}".format(x, y,angulos[2]))
+        print(angle_z)
+    contador = contador + 1
+
+def angulo (angle_z):
+    angle_deg = math.degrees(angle_z)
+    if angle_deg < 0:
+        angle_deg = angle_deg + 360.00
+    return angle_deg
 
 # A função a seguir é chamada sempre que chega um novo frame
 def roda_todo_frame(imagem):
@@ -148,7 +176,13 @@ def roda_todo_frame(imagem):
 
         mask_yellow = rl.segmenta_linha_amarela_bgr(bgr)
         mask_yellow = rl.morpho_limpa(mask_yellow)
-        mask_yellow = rl.maskYellowBloqueiaEsquerda(mask_yellow)
+
+        if ESTADO == DIREITA:
+            mask_yellow = rl.maskYellowBloqueiaEsquerda(mask_yellow)
+
+        if ESTADO == ESQUERDA: 
+            mask_yellow = rl.maskYellowBloqueiaDireita(mask_yellow)
+
         output, coef_angular, x = rl.ajuste_linear_grafico_x_fy(mask_yellow)
         print(x)
 
@@ -241,7 +275,7 @@ def andar(coef_angular, x):
             w = -0.05
         elif x[0] > 480:
             v = 0.05
-            w = -0.07
+            w = -0.05
         else:
             v = 0.05
             w = 0.07
@@ -250,6 +284,17 @@ def andar(coef_angular, x):
         w = 0
 
     return v,w
+
+""" def giro (angulo_local, angulo_fin):
+    giroCompleto = False
+    angulo_init = angulo_fin - 90
+    if giroCompleto == False:
+        if angulo_init > 180:
+            if (angulo_local- angulo_init) <= 10:
+                angulo_fin = angulo_local -90
+        else:
+            if (angulo_local - angulo_init) >=:
+                angulo_fin = angulo_local + 90 """
 
 
 if __name__=="__main__":
@@ -265,6 +310,8 @@ if __name__=="__main__":
     tfl = tf2_ros.TransformListener(tf_buffer) #conversao do sistema de coordenadas 
     tolerancia = 25
 
+    w_90graus = ((1/2)*math.pi)/2 
+    w_180graus = (math.pi)/2 
     try:
         # Inicializando - por default gira no sentido anti-horário
         vel = Twist(Vector3(0,0,0), Vector3(0,0,math.pi/10.0))
@@ -273,16 +320,47 @@ if __name__=="__main__":
             for r in resultados:
                 print(r)
             v = 0
-            w = 0
-            if ESTADO == CIRCUNF:
-                if ids is not None:
-                    if 200 in ids and distancenp <= 109:
-                        v = 0
-                        w = 0 
-                        v = 0
-                        w = ((1/2)*math.pi)/2 
+            w = 0 
+            if ESTADO == LINHA:
                 v,w = andar(coef_angular, x)
-                    
+            if ESTADO == DIREITA:
+                v,w = andar(coef_angular, x)
+            elif ESTADO == ESQUERDA:
+                v,w = andar(coef_angular, x)
+            elif ESTADO == GIRO90:
+                angulo_local = angulo(angle_z)
+                if angulo_local == 1000:
+                    angulo_desejado = angulo_local + 90.00
+                v = 0
+                w = 0 
+                w = w_90graus
+                vel = Twist(Vector3(v,0,0), Vector3(0,0,w))
+                velocidade_saida.publish(vel)
+                rospy.sleep(5.0)
+                ESTADO = LINHA
+            elif ESTADO == GIRO180:
+                angulo_local = angulo(angle_z)
+                angulo_desejado = angulo_local + 180.00
+                v = 0
+                w = 0
+                w = w_180graus
+                ESTADO = LINHA
+            elif ESTADO == CIRCUNF:
+                v,w = andar(coef_angular, x)
+
+            if ids is not None:
+                if 100 in ids and distancenp <= 130:
+                    ESTADO = DIREITA
+                if 50 in ids and distancenp <= 105:
+                    ESTADO = GIRO90
+                if 150 in ids and distancenp <= 100: 
+                    ESTADO = GIRO180
+                if 200 in ids and distancenp <= 100:
+                    ESTADO = CIRCUNF
+
+            print("Vel lin :{0}".format(v))
+            print("Vel ang: {0}".format(w))
+            print (ESTADO)
             vel = Twist(Vector3(v,0,0), Vector3(0,0,w))
             velocidade_saida.publish(vel)
             rospy.sleep(0.1)

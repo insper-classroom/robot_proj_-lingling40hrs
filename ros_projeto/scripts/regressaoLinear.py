@@ -92,7 +92,7 @@ def maskYellowBloqueiaDireita(mask):
     return mask
     
 def maskYellowBloqueiaEsquerda(mask):
-    mask = cv2.rectangle(mask, (0,0), (80,480), (0,0,0), -1)
+    mask = cv2.rectangle(mask, (0,0), (200,480), (0,0,0), -1)
     return mask
 
 def ajuste_linear(mask):
@@ -128,3 +128,4 @@ def ajuste_linear_grafico_x_fy(mask):
     mask_rgb =  cv2.cvtColor(mask, cv2.COLOR_GRAY2RGB)
     cv2.line(mask_rgb, (x_int[0], y_int[0]), (x_int[1], y_int[1]), color=(0,0,255), thickness=11);    
     return mask_rgb, coef_angular, x_int
+            
