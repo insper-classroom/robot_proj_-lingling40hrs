@@ -77,11 +77,14 @@ x = 0
 y = 0
 z = 0 
 id = 0
+x_linha = 0
 coef_angular = 0
 laserDado = 10.0
 distancenp = 0
+contador = 0
+pula = 50
 angle_z = 0.0
-angulo_local = 1000
+angulo_desejado = 1000
 
 # aqui estão todos os estados usados pelo robô.
 LINHA = 0
@@ -90,6 +93,8 @@ DIREITA = 2
 ESQUERDA = 3
 GIRO90 = 4
 GIRO180 = 5
+CAVALO = 6
+CACHORRO = 7
 ESTADO = LINHA
 
 frame = "camera_link"
@@ -142,7 +147,7 @@ def roda_todo_frame(imagem):
     global centro
     global resultados
     global coef_angular
-    global x
+    global x_linha
     global ids
     global distancenp
 
@@ -183,8 +188,7 @@ def roda_todo_frame(imagem):
         if ESTADO == ESQUERDA: 
             mask_yellow = rl.maskYellowBloqueiaDireita(mask_yellow)
 
-        output, coef_angular, x = rl.ajuste_linear_grafico_x_fy(mask_yellow)
-        print(x)
+        output, coef_angular, x_linha = rl.ajuste_linear_grafico_x_fy(mask_yellow)
 
         if ids is not None:
             #-- ret = [rvec, tvec, ?]
@@ -260,20 +264,20 @@ def andar(coef_angular, x):
         v = 0.1
         w = 0
     elif coef_angular > 0.2:
-        if 300 < x[1] < 360:
+        if 300 < x_linha[1] < 360:
             v = 0.05
             w = 0.05
-        elif x[1] > 360:
+        elif x_linha[1] > 360:
             v = 0.05
             w = -0.07
         else:
             v = 0.05
             w = 0.07
     elif coef_angular < -0.2:
-        if 300 < x[0] < 360:
+        if 300 < x_linha[0] < 360:
             v = 0.05
             w = -0.05
-        elif x[0] > 480:
+        elif x_linha[0] > 480:
             v = 0.05
             w = -0.05
         else:
@@ -285,23 +289,58 @@ def andar(coef_angular, x):
 
     return v,w
 
-""" def giro (angulo_local, angulo_fin):
+def giro90 (angulo_local, angulo_fin):
     giroCompleto = False
     angulo_init = angulo_fin - 90
+    dif = abs(angulo_local- angulo_fin)
+    if angulo_init < 0:
+        angulo_init += 360
+    v = 0
+    w = 0
+    if giroCompleto == False:
+        if angulo_init > 270:
+            if dif <= 5:
+                w = 0
+                giroCompleto = True
+                return v, w, giroCompleto
+            w = -0.1
+        else:
+            if dif <= 5:
+                w = 0
+                giroCompleto = True
+                return v, w, giroCompleto
+            w = 0.1
+    return v, w, giroCompleto
+
+def giro180 (angulo_local, angulo_fin):
+    giroCompleto = False
+    angulo_init = angulo_fin - 180
+    dif = abs(angulo_local- angulo_fin)
+    if angulo_init < 0:
+        angulo_init += 360
+    v = 0
+    w = 0
     if giroCompleto == False:
         if angulo_init > 180:
-            if (angulo_local- angulo_init) <= 10:
-                angulo_fin = angulo_local -90
+            if dif <= 5:
+                w = 0
+                giroCompleto = True
+                return v, w, giroCompleto
+            w = -0.1
         else:
-            if (angulo_local - angulo_init) >=:
-                angulo_fin = angulo_local + 90 """
-
+            if dif <= 5:
+                w = 0
+                giroCompleto = True
+                return v, w, giroCompleto
+            w = 0.1
+    return v, w, giroCompleto
 
 if __name__=="__main__":
     rospy.init_node("cor")
     topico_imagem = "/camera/image/compressed"
     recebedor = rospy.Subscriber(topico_imagem, CompressedImage, roda_todo_frame, queue_size=4, buff_size = 2**24)
     recebe_scan = rospy.Subscriber("/scan", LaserScan, scaneou)
+    ref_odometria = rospy.Subscriber("/odom", Odometry, recebe_odometria)
 
     print("Usando ", topico_imagem)
 
@@ -317,10 +356,12 @@ if __name__=="__main__":
         vel = Twist(Vector3(0,0,0), Vector3(0,0,math.pi/10.0))
         
         while not rospy.is_shutdown():
-            for r in resultados:
-                print(r)
+            #for r in resultados:
+                #print(r)
             v = 0
             w = 0 
+            angulo_local = angulo(angle_z)
+            print("FUCK {0} FUCK FUCK".format(angulo_local))
             if ESTADO == LINHA:
                 v,w = andar(coef_angular, x)
             if ESTADO == DIREITA:
@@ -328,23 +369,41 @@ if __name__=="__main__":
             elif ESTADO == ESQUERDA:
                 v,w = andar(coef_angular, x)
             elif ESTADO == GIRO90:
-                angulo_local = angulo(angle_z)
-                if angulo_local == 1000:
+                if angulo_desejado == 1000:
                     angulo_desejado = angulo_local + 90.00
-                v = 0
-                w = 0 
-                w = w_90graus
-                vel = Twist(Vector3(v,0,0), Vector3(0,0,w))
-                velocidade_saida.publish(vel)
-                rospy.sleep(5.0)
-                ESTADO = LINHA
+                    if angulo_desejado > 360:
+                        angulo_desejado -= 360
+                v, w, completaGiro = giro90(angulo_local, angulo_desejado)
+                if completaGiro == True:
+                    angulo_desejado = 1000
+                    ESTADO = LINHA
             elif ESTADO == GIRO180:
-                angulo_local = angulo(angle_z)
-                angulo_desejado = angulo_local + 180.00
-                v = 0
-                w = 0
-                w = w_180graus
-                ESTADO = LINHA
+                if angulo_desejado == 1000:
+                    angulo_desejado = angulo_local + 180.00
+                    if angulo_desejado > 360:
+                        angulo_desejado -= 360
+                v, w, completaGiro = giro90(angulo_local, angulo_desejado)
+                if completaGiro == True:
+                    angulo_desejado = 1000
+                    ESTADO = LINHA
+            elif ESTADO == CAVALO:
+                if angulo_desejado == 1000:
+                    angulo_desejado = angulo_local + 180.00
+                    if angulo_desejado > 360:
+                        angulo_desejado -= 360
+                v, w, completaGiro = giro90(angulo_local, angulo_desejado)
+                if completaGiro == True:
+                    angulo_desejado = 1000
+                    ESTADO = ESQUERDA
+            elif ESTADO == CACHORRO:
+                if angulo_desejado == 1000:
+                    angulo_desejado = angulo_local + 180.00
+                    if angulo_desejado > 360:
+                        angulo_desejado -= 360
+                v, w, completaGiro = giro90(angulo_local, angulo_desejado)
+                if completaGiro == True:
+                    angulo_desejado = 1000
+                    ESTADO = DIREITA
             elif ESTADO == CIRCUNF:
                 v,w = andar(coef_angular, x)
 
@@ -352,14 +411,14 @@ if __name__=="__main__":
                 if 100 in ids and distancenp <= 130:
                     ESTADO = DIREITA
                 if 50 in ids and distancenp <= 105:
-                    ESTADO = GIRO90
+                    ESTADO = CAVALO
                 if 150 in ids and distancenp <= 100: 
-                    ESTADO = GIRO180
+                    ESTADO = CACHORRO
                 if 200 in ids and distancenp <= 100:
                     ESTADO = CIRCUNF
 
-            print("Vel lin :{0}".format(v))
-            print("Vel ang: {0}".format(w))
+            #print("Vel lin :{0}".format(v))
+            #print("Vel ang: {0}".format(w))
             print (ESTADO)
             vel = Twist(Vector3(v,0,0), Vector3(0,0,w))
             velocidade_saida.publish(vel)
