@@ -78,15 +78,16 @@ def ajuste_linear_x_fy(mask):
         y = coef_angular*x + coef_linear
     """ 
     pontos = np.where(mask==255)
-    ximg = pontos[1]
-    yimg = pontos[0]
-    yimg_c = sm.add_constant(yimg)
-    model = sm.OLS(ximg,yimg_c)
-    results = model.fit()
-    coef_angular = results.params[1] # Pegamos o beta 1
-    coef_linear =  results.params[0] # Pegamso o beta 0
-    return coef_angular, coef_linear
-
+    if np.any(pontos):
+        ximg = pontos[1]
+        yimg = pontos[0]
+        yimg_c = sm.add_constant(yimg)
+        model = sm.OLS(ximg,yimg_c)
+        results = model.fit()
+        coef_angular = results.params[1] # Pegamos o beta 1
+        coef_linear =  results.params[0] # Pegamso o beta 0
+        return coef_angular, coef_linear
+    return 1, 1
 def maskYellowBloqueiaDireita(mask):
     mask = cv2.rectangle(mask, (450,0), (720,480), (0,0,0), -1)
     return mask
@@ -117,15 +118,17 @@ def ajuste_linear_grafico_x_fy(mask):
     coef_angular, coef_linear = ajuste_linear_x_fy(mask)
     print("x = {:3f}*y + {:3f}".format(coef_angular, coef_linear))
     pontos = np.where(mask==255) # esta linha é pesada e ficou redundante
-    ximg = pontos[1]
-    yimg = pontos[0]
-    y_bounds = np.array([min(yimg), max(yimg)])
-    x_bounds = coef_angular*y_bounds + coef_linear
-    print("x bounds", x_bounds)
-    print("y bounds", y_bounds)
-    x_int = x_bounds.astype(dtype=np.int64)
-    y_int = y_bounds.astype(dtype=np.int64)
-    mask_rgb =  cv2.cvtColor(mask, cv2.COLOR_GRAY2RGB)
-    cv2.line(mask_rgb, (x_int[0], y_int[0]), (x_int[1], y_int[1]), color=(0,0,255), thickness=11);    
-    return mask_rgb, coef_angular, x_int
+    if np.any(pontos):
+        ximg = pontos[1]
+        yimg = pontos[0]
+        y_bounds = np.array([min(yimg), max(yimg)])
+        x_bounds = coef_angular*y_bounds + coef_linear
+        print("x bounds", x_bounds)
+        print("y bounds", y_bounds)
+        x_int = x_bounds.astype(dtype=np.int64)
+        y_int = y_bounds.astype(dtype=np.int64)
+        mask_rgb =  cv2.cvtColor(mask, cv2.COLOR_GRAY2RGB)
+        cv2.line(mask_rgb, (x_int[0], y_int[0]), (x_int[1], y_int[1]), color=(0,0,255), thickness=11);    
+        return mask_rgb, coef_angular, x_int
+    return mask, coef_angular, [0,0]
             
