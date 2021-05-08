@@ -95,7 +95,8 @@ GIRO90 = 4
 GIRO180 = 5
 CAVALO = 6
 CACHORRO = 7
-ESTADO = LINHA
+SAIRCIRC = 8
+ESTADO = DIREITA
 
 frame = "camera_link"
 # frame = "head_camera"  # DESCOMENTE para usar com webcam USB via roslaunch tag_tracking usbcam
@@ -291,26 +292,26 @@ def andar(coef_angular, x):
 
 def giro90 (angulo_local, angulo_fin):
     giroCompleto = False
-    angulo_init = angulo_fin - 90
+    angulo_init = angulo_fin + 90
     dif = abs(angulo_local- angulo_fin)
     if angulo_init < 0:
         angulo_init += 360
     v = 0
     w = 0
     if giroCompleto == False:
-        if angulo_init > 270:
+        if angulo_init < 90:  #se o inicial for > 270, significa que o angulo final será positivo, e que assim o robô virar para direita
             if dif <= 5:
                 w = 0
                 giroCompleto = True
                 return v, w, giroCompleto
             w = -0.1
         else:
-            if dif <= 5:
+            if dif <= 5: #virar para esquerda, anti-horário, pois os ângulos serão negativos
                 w = 0
                 giroCompleto = True
                 return v, w, giroCompleto
             w = 0.1
-    return v, w, giroCompleto
+    return v, -w, giroCompleto
 
 def giro180 (angulo_local, angulo_fin):
     giroCompleto = False
@@ -351,6 +352,9 @@ if __name__=="__main__":
 
     w_90graus = ((1/2)*math.pi)/2 
     w_180graus = (math.pi)/2 
+    velAng = Twist(Vector3(0,0,0), Vector3(0,0,w_90graus))
+    stop = Twist(Vector3(0,0,0), Vector3(0,0,0))
+
     try:
         # Inicializando - por default gira no sentido anti-horário
         vel = Twist(Vector3(0,0,0), Vector3(0,0,math.pi/10.0))
@@ -370,7 +374,7 @@ if __name__=="__main__":
                 v,w = andar(coef_angular, x)
             elif ESTADO == GIRO90:
                 if angulo_desejado == 1000:
-                    angulo_desejado = angulo_local + 90.00
+                    angulo_desejado = angulo_local - 90.00
                     if angulo_desejado > 360:
                         angulo_desejado -= 360
                 v, w, completaGiro = giro90(angulo_local, angulo_desejado)
@@ -382,7 +386,7 @@ if __name__=="__main__":
                     angulo_desejado = angulo_local + 180.00
                     if angulo_desejado > 360:
                         angulo_desejado -= 360
-                v, w, completaGiro = giro90(angulo_local, angulo_desejado)
+                v, w, completaGiro = giro180(angulo_local, angulo_desejado)
                 if completaGiro == True:
                     angulo_desejado = 1000
                     ESTADO = LINHA
@@ -391,22 +395,28 @@ if __name__=="__main__":
                     angulo_desejado = angulo_local + 180.00
                     if angulo_desejado > 360:
                         angulo_desejado -= 360
-                v, w, completaGiro = giro90(angulo_local, angulo_desejado)
+                v, w, completaGiro = giro180(angulo_local, angulo_desejado)
                 if completaGiro == True:
                     angulo_desejado = 1000
-                    ESTADO = ESQUERDA
+                    ESTADO = DIREITA
             elif ESTADO == CACHORRO:
                 if angulo_desejado == 1000:
                     angulo_desejado = angulo_local + 180.00
                     if angulo_desejado > 360:
                         angulo_desejado -= 360
-                v, w, completaGiro = giro90(angulo_local, angulo_desejado)
+                v, w, completaGiro = giro180(angulo_local, angulo_desejado)
                 if completaGiro == True:
                     angulo_desejado = 1000
                     ESTADO = DIREITA
+            elif ESTADO == SAIRCIRC:
+                pub.publish(stop)
+                pub.publish(velAng)
+                ESTADO = LINHA
             elif ESTADO == CIRCUNF:
                 v,w = andar(coef_angular, x)
-
+                if laserDado <= 1.2:
+                    ESTADO = GIRO90
+                
             if ids is not None:
                 if 100 in ids and distancenp <= 130:
                     ESTADO = DIREITA
