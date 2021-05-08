@@ -261,6 +261,15 @@ def roda_todo_frame(imagem):
         print('ex', e)
 
 def andar(coef_angular, x):
+
+    # Codigo para corrigir a direcao do robo caso o coef ang for muito proximo a zero (horizonatal)
+    if -0.2 <= coef_angular <= 0:
+        v = 0
+        w = 0.2
+    if 0.2 <= coef_angular <= 0:
+        v = 0
+        w = -0.2
+
     if -0.2 <= coef_angular <= 0.2:
         v = 0.1
         w = 0
