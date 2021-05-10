@@ -96,7 +96,7 @@ GIRO180 = 5
 CAVALO = 6
 CACHORRO = 7
 SAIRCIRC = 8
-ESTADO = DIREITA
+ESTADO = LINHA
 
 frame = "camera_link"
 # frame = "head_camera"  # DESCOMENTE para usar com webcam USB via roslaunch tag_tracking usbcam
@@ -264,7 +264,7 @@ def andar(coef_angular, x):
     if -0.2 <= coef_angular <= 0.2:
         v = 0.1
         w = 0
-    elif coef_angular > 0.2:
+    elif 10 > coef_angular > 0.2:
         if 300 < x_linha[1] < 360:
             v = 0.05
             w = 0.05
@@ -274,7 +274,7 @@ def andar(coef_angular, x):
         else:
             v = 0.05
             w = 0.07
-    elif coef_angular < -0.2:
+    elif -10< coef_angular < -0.2:
         if 300 < x_linha[0] < 360:
             v = 0.05
             w = -0.05
@@ -283,6 +283,26 @@ def andar(coef_angular, x):
             w = -0.05
         else:
             v = 0.05
+            w = 0.07
+    elif coef_angular >= 10:
+        if 300 < x_linha[1] < 360:
+            v = 0
+            w = 0.05
+        elif x_linha[1] > 360:
+            v = 0
+            w = -0.07
+        else:
+            v = 0
+            w = 0.07
+    elif coef_angular <= -10:
+        if 300 < x_linha[0] < 360:
+            v = 0
+            w = -0.05
+        elif x_linha[0] > 480:
+            v = 0
+            w = -0.05
+        else:
+            v = 0
             w = 0.07
     else:
         v = 0
