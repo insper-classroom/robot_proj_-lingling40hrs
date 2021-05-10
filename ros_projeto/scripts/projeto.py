@@ -80,6 +80,7 @@ id = 0
 x_linha = 0
 coef_angular = 0
 laserDado = 10.0
+laserDadofrente = 10.0
 distancenp = 0
 contador = 0
 pula = 50
@@ -95,8 +96,8 @@ GIRO90 = 4
 GIRO180 = 5
 CAVALO = 6
 CACHORRO = 7
-SAIRCIRC = 8
-ESTADO = LINHA
+DIREITAMAIOR = 8
+ESTADO = DIREITA
 
 frame = "camera_link"
 # frame = "head_camera"  # DESCOMENTE para usar com webcam USB via roslaunch tag_tracking usbcam
@@ -183,11 +184,14 @@ def roda_todo_frame(imagem):
         mask_yellow = rl.segmenta_linha_amarela_bgr(bgr)
         mask_yellow = rl.morpho_limpa(mask_yellow)
 
-        if ESTADO == DIREITA:
+        if ESTADO == DIREITA :
             mask_yellow = rl.maskYellowBloqueiaEsquerda(mask_yellow)
 
         if ESTADO == ESQUERDA: 
             mask_yellow = rl.maskYellowBloqueiaDireita(mask_yellow)
+        
+        if ESTADO == DIREITAMAIOR:
+            mask_yellow = rl.maskYellowBloqueiaEsquerdaMaior(mask_yellow)
 
         output, coef_angular, x_linha = rl.ajuste_linear_grafico_x_fy(mask_yellow)
 
@@ -259,12 +263,13 @@ def roda_todo_frame(imagem):
         cv2.waitKey(1)
     except CvBridgeError as e:
         print('ex', e)
+        
 
 def andar(coef_angular, x):
     if -0.2 <= coef_angular <= 0.2:
         v = 0.1
         w = 0
-    elif 10 > coef_angular > 0.2:
+    elif 3 > coef_angular > 0.2:
         if 300 < x_linha[1] < 360:
             v = 0.05
             w = 0.05
@@ -274,7 +279,7 @@ def andar(coef_angular, x):
         else:
             v = 0.05
             w = 0.07
-    elif -10< coef_angular < -0.2:
+    elif -3< coef_angular < -0.2:
         if 300 < x_linha[0] < 360:
             v = 0.05
             w = -0.05
@@ -284,7 +289,7 @@ def andar(coef_angular, x):
         else:
             v = 0.05
             w = 0.07
-    elif coef_angular >= 10:
+    elif coef_angular >= 3:
         if 300 < x_linha[1] < 360:
             v = 0
             w = 0.05
@@ -294,7 +299,7 @@ def andar(coef_angular, x):
         else:
             v = 0
             w = 0.07
-    elif coef_angular <= -10:
+    elif coef_angular <= -3:
         if 300 < x_linha[0] < 360:
             v = 0
             w = -0.05
@@ -309,6 +314,37 @@ def andar(coef_angular, x):
         w = 0
 
     return v,w
+
+def andarcircunf(coef_angular, x):
+    if -0.2 <= coef_angular <= 0.2:
+        v = 0.1
+        w = 0
+    elif coef_angular > 0.2:
+        if 300 < x_linha[1] < 360:
+            v = 0.05
+            w = 0.05
+        elif x_linha[1] > 360:
+            v = 0.05
+            w = -0.07
+        else:
+            v = 0.05
+            w = 0.07
+    elif coef_angular < -0.2:
+        if 300 < x_linha[0] < 360:
+            v = 0.05
+            w = -0.05
+        elif x_linha[0] > 480:
+            v = 0.05
+            w = -0.05
+        else:
+            v = 0.05
+            w = 0.07
+    else:
+        v = 0
+        w = 0
+
+    return v,w
+
 
 def giro90 (angulo_local, angulo_fin):
     giroCompleto = False
@@ -392,6 +428,8 @@ if __name__=="__main__":
                 v,w = andar(coef_angular, x)
             elif ESTADO == ESQUERDA:
                 v,w = andar(coef_angular, x)
+            elif ESTADO == DIREITAMAIOR:
+                v,w = andar(coef_angular, x)
             elif ESTADO == GIRO90:
                 if angulo_desejado == 1000:
                     angulo_desejado = angulo_local - 90.00
@@ -418,7 +456,7 @@ if __name__=="__main__":
                 v, w, completaGiro = giro180(angulo_local, angulo_desejado)
                 if completaGiro == True:
                     angulo_desejado = 1000
-                    ESTADO = DIREITA
+                    ESTADO = DIREITAMAIOR
             elif ESTADO == CACHORRO:
                 if angulo_desejado == 1000:
                     angulo_desejado = angulo_local + 180.00
@@ -428,13 +466,9 @@ if __name__=="__main__":
                 if completaGiro == True:
                     angulo_desejado = 1000
                     ESTADO = DIREITA
-            elif ESTADO == SAIRCIRC:
-                pub.publish(stop)
-                pub.publish(velAng)
-                ESTADO = LINHA
             elif ESTADO == CIRCUNF:
-                v,w = andar(coef_angular, x)
-                if laserDado <= 1.2:
+                v,w = andarcircunf(coef_angular, x)
+                if laserDado <= 1.2 and angulo_local <= 280:
                     ESTADO = GIRO90
                 
             if ids is not None:
@@ -444,7 +478,7 @@ if __name__=="__main__":
                     ESTADO = CAVALO
                 if 150 in ids and distancenp <= 100: 
                     ESTADO = CACHORRO
-                if 200 in ids and distancenp <= 100:
+                if 200 in ids and distancenp <= 120:
                     ESTADO = CIRCUNF
 
             #print("Vel lin :{0}".format(v))

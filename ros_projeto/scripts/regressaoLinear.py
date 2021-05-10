@@ -96,6 +96,11 @@ def maskYellowBloqueiaEsquerda(mask):
     mask = cv2.rectangle(mask, (0,0), (200,480), (0,0,0), -1)
     return mask
 
+def maskYellowBloqueiaEsquerdaMaior(mask):
+    mask = cv2.rectangle(mask, (0,0), (300,480), (0,0,0), -1)
+    return mask
+
+
 def ajuste_linear(mask):
     """Recebe uma imagem já limiarizada e faz um ajuste linear
         retorna coeficientes linear e angular da reta
