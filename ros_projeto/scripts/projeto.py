@@ -19,6 +19,8 @@ from geometry_msgs.msg import Twist, Vector3, Pose, Vector3Stamped
 from sensor_msgs.msg import LaserScan
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Header
+from std_msgs.msg import Float64
+
 
 print("EXECUTE ANTES da 1.a vez: ")
 print("wget https://github.com/Insper/robot21.1/raw/main/projeto/ros_projeto/scripts/MobileNetSSD_deploy.caffemodel")
@@ -26,7 +28,7 @@ print("PARA TER OS PESOS DA REDE NEURAL")
 
 import visao_module
 import regressaoLinear as rl
-
+import corModule as cM
 import cv2.aruco as aruco
 
 #--- Define Tag de teste
@@ -77,10 +79,11 @@ x = 0
 y = 0
 z = 0 
 id = 0
-x_linha = [0]
+x_linha = [0,0]
 coef_angular = 0
-laserDado = 10.0
-laserDadofrente = 10.0
+laserDadoSairCentro = 10.0
+laserDadoFrente = 10.0
+laserDadoCreeper = 10.0
 distancenp = 0
 contador = 0
 pula = 50
@@ -98,7 +101,13 @@ CAVALO = 6
 CACHORRO = 7
 DIREITAMAIOR = 8
 GIROCIRCUNF = 9
+SOLTARCREEPER = 11
 ESTADO = LINHA
+
+COR = None
+LARANJA = 20
+VERDE = 21
+AZUL = 22
 
 frame = "camera_link"
 # frame = "head_camera"  # DESCOMENTE para usar com webcam USB via roslaunch tag_tracking usbcam
@@ -111,8 +120,16 @@ def scaneou(dado):
     #print("Faixa valida: ", dado.range_min , " - ", dado.range_max )
     #print("Leituras:")
     #print(np.array(dado.ranges).round(decimals=2))
-    global laserDado
-    laserDado = dado.ranges[90]
+    global laserDadoSairCentro
+    global laserDadoCreeper
+    global laserDadoFrente
+    laserDadoFrente = dado.ranges[0]
+    laserDadoSairCentro = dado.ranges[90]
+    laser0to15 = np.min(dado.ranges[0:45])
+    laser345to360 = np.min(dado.ranges[315:360])
+    listaMinimosLaser = [laser0to15, laser345to360]
+    laserDadoCreeper = np.min(listaMinimosLaser)
+    # print(f'\n\n\n\n\n {laserDadoCreeper}')    
     #print("Intensities")
     #print(np.array(dado.intensities).round(decimals=2))
 
@@ -179,7 +196,7 @@ def roda_todo_frame(imagem):
               
         for r in resultados:
             # print(r) - print feito para documentar e entender
-            # o resultado            
+            # o resultado
             pass
 
         mask_yellow = rl.segmenta_linha_amarela_bgr(bgr)
@@ -193,6 +210,18 @@ def roda_todo_frame(imagem):
         
         if ESTADO == DIREITAMAIOR:
             mask_yellow = rl.maskYellowBloqueiaEsquerdaMaior(mask_yellow)
+
+        if  COR == LARANJA:
+            maskLaranja, media, centro, maior_area = cM.identifica_cor_laranja(temp_image)
+            cv2.imshow("Laranja", maskLaranja)
+
+        if  COR == AZUL:
+            maskAzul, media, centro, maior_area = cM.identifica_cor_azul(temp_image)
+            cv2.imshow("Azul", maskAzul)
+            
+        if  COR == VERDE:
+            maskLaranja, media, centro, maior_area = cM.identifica_cor_verde(temp_image)
+            cv2.imshow("Verde", maskVerde)
 
         output, coef_angular, x_linha = rl.ajuste_linear_grafico_x_fy(mask_yellow)
 
@@ -267,11 +296,11 @@ def roda_todo_frame(imagem):
         
 
 def andar(coef_angular, x_linha):
-    
-    erro_x = x_linha[0] - 360
+    meio_linha = (x_linha[0] + x_linha[1])/2
+    erro_x = meio_linha - 360
     v = 0.4- abs(erro_x)/900
     erro_coefang = coef_angular
-    w = (-erro_x/1200) + (erro_coefang/160) # Valor bom para retas em erro_x = 1200 e erro_coefang/160 
+    w = (-erro_x/800) + (erro_coefang/160) # Valor bom para retas em erro_x = 1200 e erro_coefang/160 
     print('VELOCIDADE ANGULAR:', w)
 
     """ if -0.2 <= coef_angular <= 0.2:
@@ -355,6 +384,8 @@ def andarcircunf(coef_angular, x_linha):
 
 
 def giro90 (angulo_local, angulo_fin):
+    print("ANGULO OBJETIVO", angulo_fin)
+    print("ANGULO ATUAL", angulo_local)
     giroCompleto = False
     angulo_init = angulo_fin + 90
     dif = abs(angulo_local- angulo_fin)
@@ -406,6 +437,8 @@ if __name__=="__main__":
     recebedor = rospy.Subscriber(topico_imagem, CompressedImage, roda_todo_frame, queue_size=4, buff_size = 2**24)
     recebe_scan = rospy.Subscriber("/scan", LaserScan, scaneou)
     ref_odometria = rospy.Subscriber("/odom", Odometry, recebe_odometria)
+    ombro = rospy.Publisher("/joint1_position_controller/command", Float64, queue_size=1)
+    garra = rospy.Publisher("/joint2_position_controller/command", Float64, queue_size=1)
 
     print("Usando ", topico_imagem)
 
@@ -413,6 +446,8 @@ if __name__=="__main__":
 
     tfl = tf2_ros.TransformListener(tf_buffer) #conversao do sistema de coordenadas 
     tolerancia = 25
+    ANDAR = True
+    PEGARCREEPER = False
 
     w_90graus = ((1/2)*math.pi)/2 
     w_180graus = (math.pi)/2 
@@ -422,72 +457,112 @@ if __name__=="__main__":
     try:
         # Inicializando - por default gira no sentido anti-horário
         vel = Twist(Vector3(0,0,0), Vector3(0,0,math.pi/10.0))
+        cor = 'orange' # input("Qual é a cor do creeper?: ")
+        id = 11   #input("Qual é o id do creeper?")
+        estacao = 'dog'  # input ("Qual é a estação que você quer levar o creeper?")
+
+        goal = (cor, id, estacao)
         
         while not rospy.is_shutdown():
             #for r in resultados:
                 #print(r)
-            v = 0
-            w = 0 
-            angulo_local = angulo(angle_z)
-            print("FUCK {0} FUCK FUCK".format(x_linha))
-            if ESTADO == LINHA:
-                v,w = andar(coef_angular, x_linha)
-            if ESTADO == DIREITA:
-                v,w = andar(coef_angular, x_linha)
-            elif ESTADO == ESQUERDA:
-                v,w = andar(coef_angular, x_linha)
-            elif ESTADO == DIREITAMAIOR:
-                v,w = andar(coef_angular, x_linha)
-            elif ESTADO == GIRO90:
-                if angulo_desejado == 1000:
-                    angulo_desejado = angulo_local - 90.00
-                    if angulo_desejado > 360:
-                        angulo_desejado -= 360
-                v, w, completaGiro = giro90(angulo_local, angulo_desejado)
-                if completaGiro == True:
-                    angulo_desejado = 1000
-                    ESTADO = LINHA
-            elif ESTADO == GIRO180:
-                if angulo_desejado == 1000:
-                    angulo_desejado = angulo_local + 180.00
-                    if angulo_desejado > 360:
-                        angulo_desejado -= 360
-                v, w, completaGiro = giro180(angulo_local, angulo_desejado)
-                if completaGiro == True:
-                    angulo_desejado = 1000
-                    ESTADO = LINHA
-            elif ESTADO == CAVALO:
-                if angulo_desejado == 1000:
-                    angulo_desejado = angulo_local + 180.00
-                    if angulo_desejado > 360:
-                        angulo_desejado -= 360
-                v, w, completaGiro = giro180(angulo_local, angulo_desejado)
-                if completaGiro == True:
-                    angulo_desejado = 1000
-                    ESTADO = DIREITAMAIOR
-            elif ESTADO == CACHORRO:
-                if angulo_desejado == 1000:
-                    angulo_desejado = angulo_local + 180.00
-                    if angulo_desejado > 360:
-                        angulo_desejado -= 360
-                v, w, completaGiro = giro180(angulo_local, angulo_desejado)
-                if completaGiro == True:
-                    angulo_desejado = 1000
-                    ESTADO = DIREITA
-            elif ESTADO == CIRCUNF:
-                v,w = andar(coef_angular, x_linha)
-                if laserDado <= 0.5 and angulo_local <= 280:
-                    ESTADO = GIRO90
-            elif ESTADO == GIROCIRCUNF:
-                if angulo_desejado == 1000:
-                    angulo_desejado = angulo_local - 45.00
-                    if angulo_desejado > 360:
-                        angulo_desejado -= 360
-                v, w, completaGiro = giro90(angulo_local, angulo_desejado)
-                if completaGiro == True:
-                    angulo_desejado = 1000
-                    ESTADO = CIRCUNF
                 
+            #goal1 = ("blue", 22, "dog")
+            if ANDAR:
+                v = 0
+                w = 0 
+                angulo_local = angulo(angle_z)
+                if ESTADO == LINHA:
+                    v,w = andar(coef_angular, x_linha)
+                if ESTADO == DIREITA:
+                    v,w = andar(coef_angular, x_linha)
+                elif ESTADO == ESQUERDA:
+                    v,w = andar(coef_angular, x_linha)
+                elif ESTADO == DIREITAMAIOR:
+                    v,w = andar(coef_angular, x_linha)
+                elif ESTADO == GIRO90:
+                    if angulo_desejado == 1000:
+                        angulo_desejado = angulo_local - 90.00
+                        if angulo_desejado > 360:
+                            angulo_desejado -= 360
+                        if angulo_desejado < 0:
+                            angulo_desejado += 360
+                    v, w, completaGiro = giro90(angulo_local, angulo_desejado)
+                    if completaGiro == True:
+                        angulo_desejado = 1000
+                        ESTADO = LINHA
+                elif ESTADO == GIRO180:
+                    if angulo_desejado == 1000:
+                        angulo_desejado = angulo_local + 180.00
+                        if angulo_desejado > 360:
+                            angulo_desejado -= 360
+                    v, w, completaGiro = giro180(angulo_local, angulo_desejado)
+                    if completaGiro == True:
+                        angulo_desejado = 1000
+                        ESTADO = LINHA
+                elif ESTADO == CAVALO:
+                    if angulo_desejado == 1000:
+                        angulo_desejado = angulo_local + 180.00
+                        if angulo_desejado > 360:
+                            angulo_desejado -= 360
+                    v, w, completaGiro = giro180(angulo_local, angulo_desejado)
+                    if completaGiro == True:
+                        angulo_desejado = 1000
+                        ESTADO = DIREITAMAIOR
+                elif ESTADO == CACHORRO:
+                    if angulo_desejado == 1000:
+                        angulo_desejado = angulo_local + 180.00
+                        if angulo_desejado > 360:
+                            angulo_desejado -= 360
+                    v, w, completaGiro = giro180(angulo_local, angulo_desejado)
+                    if completaGiro == True:
+                        angulo_desejado = 1000
+                        ESTADO = DIREITA
+                elif ESTADO == CIRCUNF:
+                    v,w = andar(coef_angular, x_linha)
+                    if laserDadoSairCentro <= 0.5 and angulo_local <= 280:
+                        ESTADO = GIRO90
+                elif ESTADO == GIROCIRCUNF:
+                    if angulo_desejado == 1000:
+                        angulo_desejado = angulo_local - 45.00
+                        if angulo_desejado > 360:
+                            angulo_desejado -= 360
+                        if angulo_desejado < 0:
+                            angulo_desejado += 360
+                    v, w, completaGiro = giro90(angulo_local, angulo_desejado)
+                    if completaGiro == True:
+                        angulo_desejado = 1000
+                        ESTADO = CIRCUNF
+                
+                if ids is not None:        
+                    print("CHEQUEI")
+                    if laserDadoCreeper <= 1.5 and media[0]!=0 and centro[0] !=0 and id in ids:
+                        print("ENTREI")
+                        PEGARCREEPER = True
+                        ANDAR = False
+
+            elif PEGARCREEPER:
+                w=0
+                v=0
+                #if len(media) != 0 and len(centro) != 0 and id = 22:
+                    # print("Média dos azuis: {0}, {1}".format(media[0], media[1]))
+                    # print("Centro dos azuis: {0}, {1}".format(centro[0], centro[1]))
+
+                if (media[0] > centro[0]):
+                    w = -0.05
+                if (media[0] < centro[0]):
+                    w = 0.05
+
+                if  abs(media[0]-centro[0]) <= 10:
+                    if laserDadoFrente > 0.3:
+                        v = 0.1
+                    
+                    elif laserDadoCreeper <= 0.15:
+                        v = 0
+                        w = 0
+                        print('\n\n\n\n CHEGUEMO NO CRÉPE')
+                
+
             if ids is not None:
                 if 100 in ids and distancenp <= 200:
                     ESTADO = DIREITA
@@ -497,6 +572,15 @@ if __name__=="__main__":
                     ESTADO = CACHORRO
                 if 200 in ids and distancenp <= 80:
                     ESTADO = GIROCIRCUNF
+
+            
+            if cor == 'orange':
+                COR = LARANJA
+            elif cor == 'blue':
+                COR = AZUL
+            else:
+                COR = VERDE
+
 
             #print("Vel lin :{0}".format(v))
             #print("Vel ang: {0}".format(w))

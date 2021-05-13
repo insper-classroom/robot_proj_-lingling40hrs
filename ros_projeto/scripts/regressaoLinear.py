@@ -100,6 +100,33 @@ def maskYellowBloqueiaEsquerdaMaior(mask):
     mask = cv2.rectangle(mask, (0,0), (300,480), (0,0,0), -1)
     return mask
 
+'''def SegmentaVerde(img):
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    img = hsv.copy()
+    hsv1 =(45,100,100)
+    hsv2 = (75, 255, 255)
+
+    maskVerde = cv2.inRange(img, hsv1, hsv2)
+
+    return maskVerde'''
+
+'''def SegmentaAzul(img):
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    img = hsv.copy()
+    hsv1 = (75,50,50)
+    hsv2 = (95, 255, 255)
+    maskAzul = cv2.inRange(img, hsv1, hsv2)
+
+    return maskAzul'''
+    
+'''def SegmentaLaranja(img):
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    img = hsv.copy()
+    hsv1 = (0,200,200)
+    hsv2 = (20, 255, 255)
+    maskLaranja = cv2.inRange(img, hsv1, hsv2)
+
+    return maskLaranja'''    
 
 def ajuste_linear(mask):
     """Recebe uma imagem já limiarizada e faz um ajuste linear
