@@ -464,7 +464,7 @@ if __name__=="__main__":
                 v, w, completaGiro = giro180(angulo_local, angulo_desejado)
                 if completaGiro == True:
                     angulo_desejado = 1000
-                    ESTADO = DIREITA
+                    ESTADO = DIREITAMAIOR
             elif ESTADO == CACHORRO:
                 if angulo_desejado == 1000:
                     angulo_desejado = angulo_local + 180.00
