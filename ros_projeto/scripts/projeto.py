@@ -20,6 +20,8 @@ from sensor_msgs.msg import LaserScan
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Header
 from std_msgs.msg import Float64
+from LingLingRobot import  garra
+
 
 
 print("EXECUTE ANTES da 1.a vez: ")
@@ -129,7 +131,7 @@ def scaneou(dado):
     laser345to360 = np.min(dado.ranges[315:360])
     listaMinimosLaser = [laser0to15, laser345to360]
     laserDadoCreeper = np.min(listaMinimosLaser)
-    # print(f'\n\n\n\n\n {laserDadoCreeper}')    
+    print(f'\n\n\n\n\n {laserDadoCreeper}')    
     #print("Intensities")
     #print(np.array(dado.intensities).round(decimals=2))
 
@@ -303,89 +305,9 @@ def andar(coef_angular, x_linha):
     w = (-erro_x/800) + (erro_coefang/160) # Valor bom para retas em erro_x = 1200 e erro_coefang/160 
     print('VELOCIDADE ANGULAR:', w)
 
-    """ if -0.2 <= coef_angular <= 0.2:
-        v = 0.1
-        w = 0
-    elif 3 > coef_angular > 0.2:
-        if 300 < x_linha[1] < 360:
-            v = 0.05
-            w = 0.05
-        elif x_linha[1] > 360:
-            v = 0.05
-            w = -0.07
-        else:
-            v = 0.05
-            w = 0.07
-    elif -3< coef_angular < -0.2:
-        if 300 < x_linha[0] < 360:
-            v = 0.05
-            w = -0.05
-        elif x_linha[0] > 480:
-            v = 0.05
-            w = -0.05
-        else:
-            v = 0.05
-            w = 0.07
-    elif coef_angular >= 3:
-        if 300 < x_linha[1] < 360:
-            v = 0
-            w = 0.05
-        elif x_linha[1] > 360:
-            v = 0
-            w = -0.07
-        else:
-            v = 0
-            w = 0.07
-    elif coef_angular <= -3:
-        if 300 < x_linha[0] < 360:
-            v = 0
-            w = -0.05
-        elif x_linha[0] > 480:
-            v = 0
-            w = -0.05
-        else:
-            v = 0
-            w = 0.07
-    else:
-        v = 0
-        w = 0 """
-
     return v,w
-
-def andarcircunf(coef_angular, x_linha):
-    if -0.2 <= coef_angular <= 0.2:
-        v = 0.1
-        w = 0
-    elif coef_angular > 0.2:
-        if 300 < x_linha[1] < 360:
-            v = 0.05
-            w = 0.05
-        elif x_linha[1] > 360:
-            v = 0.05
-            w = -0.07
-        else:
-            v = 0.05
-            w = 0.07
-    elif coef_angular < -0.2:
-        if 300 < x_linha[0] < 360:
-            v = 0.05
-            w = -0.05
-        elif x_linha[0] > 480:
-            v = 0.05
-            w = -0.05
-        else:
-            v = 0.05
-            w = 0.07
-    else:
-        v = 0
-        w = 0
-
-    return v,w
-
 
 def giro90 (angulo_local, angulo_fin):
-    print("ANGULO OBJETIVO", angulo_fin)
-    print("ANGULO ATUAL", angulo_local)
     giroCompleto = False
     angulo_init = angulo_fin + 90
     dif = abs(angulo_local- angulo_fin)
@@ -437,8 +359,8 @@ if __name__=="__main__":
     recebedor = rospy.Subscriber(topico_imagem, CompressedImage, roda_todo_frame, queue_size=4, buff_size = 2**24)
     recebe_scan = rospy.Subscriber("/scan", LaserScan, scaneou)
     ref_odometria = rospy.Subscriber("/odom", Odometry, recebe_odometria)
-    ombro = rospy.Publisher("/joint1_position_controller/command", Float64, queue_size=1)
-    garra = rospy.Publisher("/joint2_position_controller/command", Float64, queue_size=1)
+    ombro_publisher = rospy.Publisher("/joint1_position_controller/command", Float64, queue_size=1)
+    garra_publisher = rospy.Publisher("/joint2_position_controller/command", Float64, queue_size=1)
 
     print("Usando ", topico_imagem)
 
@@ -474,12 +396,16 @@ if __name__=="__main__":
                 angulo_local = angulo(angle_z)
                 if ESTADO == LINHA:
                     v,w = andar(coef_angular, x_linha)
+
                 if ESTADO == DIREITA:
                     v,w = andar(coef_angular, x_linha)
+
                 elif ESTADO == ESQUERDA:
                     v,w = andar(coef_angular, x_linha)
+
                 elif ESTADO == DIREITAMAIOR:
                     v,w = andar(coef_angular, x_linha)
+
                 elif ESTADO == GIRO90:
                     if angulo_desejado == 1000:
                         angulo_desejado = angulo_local - 90.00
@@ -491,6 +417,7 @@ if __name__=="__main__":
                     if completaGiro == True:
                         angulo_desejado = 1000
                         ESTADO = LINHA
+
                 elif ESTADO == GIRO180:
                     if angulo_desejado == 1000:
                         angulo_desejado = angulo_local + 180.00
@@ -500,6 +427,7 @@ if __name__=="__main__":
                     if completaGiro == True:
                         angulo_desejado = 1000
                         ESTADO = LINHA
+
                 elif ESTADO == CAVALO:
                     if angulo_desejado == 1000:
                         angulo_desejado = angulo_local + 180.00
@@ -509,6 +437,7 @@ if __name__=="__main__":
                     if completaGiro == True:
                         angulo_desejado = 1000
                         ESTADO = DIREITAMAIOR
+
                 elif ESTADO == CACHORRO:
                     if angulo_desejado == 1000:
                         angulo_desejado = angulo_local + 180.00
@@ -518,10 +447,12 @@ if __name__=="__main__":
                     if completaGiro == True:
                         angulo_desejado = 1000
                         ESTADO = DIREITA
+
                 elif ESTADO == CIRCUNF:
                     v,w = andar(coef_angular, x_linha)
                     if laserDadoSairCentro <= 0.5 and angulo_local <= 280:
                         ESTADO = GIRO90
+
                 elif ESTADO == GIROCIRCUNF:
                     if angulo_desejado == 1000:
                         angulo_desejado = angulo_local - 45.00
@@ -543,7 +474,7 @@ if __name__=="__main__":
 
             elif PEGARCREEPER:
                 w=0
-                v=0
+                v= 0.2 - 0.04/laserDadoCreeper
                 #if len(media) != 0 and len(centro) != 0 and id = 22:
                     # print("Média dos azuis: {0}, {1}".format(media[0], media[1]))
                     # print("Centro dos azuis: {0}, {1}".format(centro[0], centro[1]))
@@ -553,14 +484,15 @@ if __name__=="__main__":
                 if (media[0] < centro[0]):
                     w = 0.05
 
-                if  abs(media[0]-centro[0]) <= 10:
-                    if laserDadoFrente > 0.3:
-                        v = 0.1
+                if laserDadoCreeper <= 0.21:
+                    w = 0
+                    v = 0
                     
-                    elif laserDadoCreeper <= 0.15:
-                        v = 0
-                        w = 0
-                        print('\n\n\n\n CHEGUEMO NO CRÉPE')
+                    garra_publisher.publish(0.0)
+                    print("open")
+                    garra_publisher.publish(0.0)
+
+                    print('\n\n\n\n CHEGUEMO NO CRÉPE')
                 
 
             if ids is not None:
