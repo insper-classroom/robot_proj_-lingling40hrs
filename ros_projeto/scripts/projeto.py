@@ -90,6 +90,7 @@ contador = 0
 pula = 50
 angle_z = 0.0
 angulo_desejado = 1000
+tempoCreeper = True
 
 # aqui estão todos os estados usados pelo robô.
 LINHA = 0
@@ -102,7 +103,8 @@ CAVALO = 6
 CACHORRO = 7
 DIREITAMAIOR = 8
 GIROCIRCUNF = 9
-SOLTARCREEPER = 11
+CREEPERNAMAO = 11
+
 ESTADO = LINHA
 
 COR = None
@@ -201,7 +203,8 @@ def roda_todo_frame(imagem):
         # Note que os resultados já são guardados automaticamente na variável
         # chamada resultados
               
-        for r in resultados:
+        for r in range(len(resultados)):
+            
             # print(r) - print feito para documentar e entender
             # o resultado
             pass
@@ -305,7 +308,7 @@ def roda_todo_frame(imagem):
 def andar(coef_angular, x_linha):
     meio_linha = (x_linha[0] + x_linha[1])/2
     erro_x = meio_linha - 360
-    v = 0.4- abs(erro_x)/900 - 0.08/laserDadoFrente
+    v = 0.4- abs(erro_x)/900 - 0.16/laserDadoFrente
     erro_coefang = coef_angular
     w = (-erro_x/800) + (erro_coefang/160) # Valor bom para retas em erro_x = 1200 e erro_coefang/160 
     print('VELOCIDADE ANGULAR:', w)
@@ -364,6 +367,31 @@ if __name__=="__main__":
     recebedor = rospy.Subscriber(topico_imagem, CompressedImage, roda_todo_frame, queue_size=4, buff_size = 2**24)
     recebe_scan = rospy.Subscriber("/scan", LaserScan, scaneou)
     ref_odometria = rospy.Subscriber("/odom", Odometry, recebe_odometria)
+
+    '''
+        Antes de iniciar o programa é necessário rodar
+        roslaunch mybot_description mybot_control2.launch
+        para fazer a garra funfar
+    '''
+
+
+    ''' O QUE FALTA?
+        CONCEITO C:
+        Pega o creeper da cor e ID corretos com a garra e volta para a pista.No retorno à pista o grupo de alunos não precisa gravar vídeo comprobatório por muito tempo. 
+        Apenas o suficiente para demonstrar que o robô encontrou a pista e voltou a executar o código de seguir. GARRA
+
+        CONCEITO B:
+        Itens do conceito B + um uso de classes e objetos Python
+        Só pode ter sleep dentro do while principal.
+        Pegar o creeper da cor certa, com o ID certo, e deixar na base certa   CLASSES
+
+        CONCEITO A:
+        Fazer um controle proporcional ou PD para manter o robô na pista e fazer funcionar rápido baseado no ângulo de visão da pista, mais ou menos como neste exemplo
+        Usar ARUCO em modo 3D
+        Encontrar os creepers que se encontram fora da pista usando mapeamento ( https://github.com/Insper/404/blob/master/tutoriais/robotica/navigation_gazebo_simulador.md)'''
+
+
+
     ombro_publisher = rospy.Publisher("/joint1_position_controller/command", Float64, queue_size=1)
     garra_publisher = rospy.Publisher("/joint2_position_controller/command", Float64, queue_size=1)
 
@@ -375,6 +403,9 @@ if __name__=="__main__":
     tolerancia = 25
     ANDAR = True
     PEGARCREEPER = False
+    naoChegou80Cm = True
+    estacaoCentral = False
+    mediax = 0
 
     try:
         # Inicializando - por default gira no sentido anti-horário
@@ -464,37 +495,69 @@ if __name__=="__main__":
                     if completaGiro == True:
                         angulo_desejado = 1000
                         ESTADO = CIRCUNF
+
+                #IR PARA ESTAÇÃOOOO TENTAR DEPOIS 
+                elif ESTADO == CREEPERNAMAO:
+                
+                    for r in resultados:
+                        print(r)
+                        print("gatoC", estacaoCentral)
+                        print("naoChegou", naoChegou80Cm)
+                        if r[0] == estacao:
+                            mediax = abs((r[2][0] + r[3][0])/2)
+                    #velocidade_saida.publish(vel)
+                    if laserDadoFrente >= 0.8 and naoChegou80Cm == True:
+                        v,w = andar(coef_angular, x_linha)
+                    elif naoChegou80Cm == False and estacaoCentral == False:
+                        v = 0.1
+                    else:   
+                        if laserDadoFrente == 0: #no começo do Frame o laser dado == 0
+                            naoChegou80Cm = True
+                        else:
+                            v = 0
+                            w = 0
+                            naoChegou80Cm = False
+                    if len(centro) != 0 and mediax != 0:
+                        if abs(centro[0] - mediax) <= 10:
+                            estacaoCentral = True
+                            if laserDadoFrente >= 1:
+                                v = 0
+                            elif laserDadoFrente < 1:
+                                v = -0.1
+                    
                 
                 if ids is not None:        
                     print("CHEQUEI")
-                    if laserDadoCreeper <= 1.5 and media[0]!=0 and centro[0] !=0 and id in ids:
+                    if laserDadoCreeper <= 1.5 and media[0]!=0 and centro[0] !=0 and id in ids and distancenp <= 700:
                         print("ENTREI")
                         PEGARCREEPER = True
                         ANDAR = False
 
             elif PEGARCREEPER:
-                w=0
-                v= 0.2 - 0.04/laserDadoCreeper
-                #if len(media) != 0 and len(centro) != 0 and id = 22:
-                    # print("Média dos azuis: {0}, {1}".format(media[0], media[1]))
-                    # print("Centro dos azuis: {0}, {1}".format(centro[0], centro[1]))
-
-                if (media[0] > centro[0]):
-                    w = -0.05
-                if (media[0] < centro[0]):
-                    w = 0.05
-
-                if laserDadoCreeper <= 0.21:
+                if laserDadoCreeper <= 0.17:
+                    if tempoCreeper:
+                        tempo_inicial = rospy.get_time()
+                        tempoCreeper = False
+                        
                     w = 0
                     v = 0
                     garra_publisher.publish(-1.0) #aberto
-                    rospy.sleep(1.5)
                     ombro_publisher.publish(0.0) #para cimaa: metade
-                    rospy.sleep(1.5)
-                    garra_publisher.publish(0.0) #fechado
-                    rospy.sleep(1.5)
-
-                    print('\n\n\n\n CHEGUEMO NO CRÉPE')
+                    tempo_final = rospy.get_time()
+                    if tempo_final - tempo_inicial >= 2.5:
+                        garra_publisher.publish(0.0) #fechado
+                        if tempo_final - tempo_inicial >= 5:
+                            ombro_publisher.publish(1.5)
+                            ESTADO =  CREEPERNAMAO
+                            PEGARCREEPER = False
+                            ANDAR = True  #volta a andar 
+                          
+                else:
+                    erro_xcreeper = media[0] - centro[0]
+                    w= - (erro_xcreeper/900)
+                    v= 0.4 - 0.072/laserDadoCreeper - abs(erro_xcreeper)/1500
+                print('\n\n\n\n achemos O CRÉPE')  
+                    
                 
 
             if ids is not None:
