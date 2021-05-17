@@ -20,7 +20,6 @@ from sensor_msgs.msg import LaserScan
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Header
 from std_msgs.msg import Float64
-from LingLingRobot import  garra
 
 
 
@@ -110,6 +109,12 @@ COR = None
 LARANJA = 20
 VERDE = 21
 AZUL = 22
+
+ESTACAO = 0
+EST_BIF = 51
+EST_CAV = 52
+EST_DOG = 53
+EST_CIR = 54
 
 frame = "camera_link"
 # frame = "head_camera"  # DESCOMENTE para usar com webcam USB via roslaunch tag_tracking usbcam
@@ -300,7 +305,7 @@ def roda_todo_frame(imagem):
 def andar(coef_angular, x_linha):
     meio_linha = (x_linha[0] + x_linha[1])/2
     erro_x = meio_linha - 360
-    v = 0.4- abs(erro_x)/900
+    v = 0.4- abs(erro_x)/900 - 0.08/laserDadoFrente
     erro_coefang = coef_angular
     w = (-erro_x/800) + (erro_coefang/160) # Valor bom para retas em erro_x = 1200 e erro_coefang/160 
     print('VELOCIDADE ANGULAR:', w)
@@ -370,11 +375,6 @@ if __name__=="__main__":
     tolerancia = 25
     ANDAR = True
     PEGARCREEPER = False
-
-    w_90graus = ((1/2)*math.pi)/2 
-    w_180graus = (math.pi)/2 
-    velAng = Twist(Vector3(0,0,0), Vector3(0,0,w_90graus))
-    stop = Twist(Vector3(0,0,0), Vector3(0,0,0))
 
     try:
         # Inicializando - por default gira no sentido anti-horário
@@ -487,23 +487,34 @@ if __name__=="__main__":
                 if laserDadoCreeper <= 0.21:
                     w = 0
                     v = 0
-                    
-                    garra_publisher.publish(0.0)
-                    print("open")
-                    garra_publisher.publish(0.0)
+                    garra_publisher.publish(-1.0) #aberto
+                    rospy.sleep(1.5)
+                    ombro_publisher.publish(0.0) #para cimaa: metade
+                    rospy.sleep(1.5)
+                    garra_publisher.publish(0.0) #fechado
+                    rospy.sleep(1.5)
 
                     print('\n\n\n\n CHEGUEMO NO CRÉPE')
                 
 
             if ids is not None:
-                if 100 in ids and distancenp <= 200:
-                    ESTADO = DIREITA
-                if 50 in ids and distancenp <= 105:
-                    ESTADO = CAVALO
-                if 150 in ids and distancenp <= 100: 
-                    ESTADO = CACHORRO
-                if 200 in ids and distancenp <= 80:
-                    ESTADO = GIROCIRCUNF
+                if 100 in ids:
+                    ESTACAO = EST_BIF
+                if 50 in ids:
+                    ESTACAO = EST_CAV
+                if 150 in ids: 
+                    ESTACAO = EST_DOG
+                if 200 in ids:
+                    ESTACAO = EST_CIR
+
+            if ESTACAO == EST_BIF and laserDadoFrente <= 1.8:
+                ESTADO = DIREITA
+            elif ESTACAO == EST_CAV and laserDadoFrente <= 1.2:
+                ESTADO = CAVALO
+            elif ESTACAO == EST_DOG and laserDadoFrente <= 1.2:
+                ESTADO = CACHORRO
+            elif ESTACAO == EST_CIR and laserDadoFrente <= 0.8:
+                ESTADO = GIROCIRCUNF
 
             
             if cor == 'orange':
