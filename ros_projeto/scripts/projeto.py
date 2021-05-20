@@ -249,10 +249,11 @@ def roda_todo_frame(imagem):
         output, coef_angular, x_linha = rl.ajuste_linear_grafico_x_fy(mask_yellow)
 
         if ids is not None:
+            index = list(ids).index(id)
             #-- ret = [rvec, tvec, ?]
             #-- rvec = [[rvec_1], [rvec_2], ...] vetor de rotação
             #-- tvec = [[tvec_1], [tvec_2], ...] vetor de translação
-            ret = aruco.estimatePoseSingleMarkers(corners, marker_size, camera_matrix, camera_distortion)
+            ret = aruco.estimatePoseSingleMarkers(corners[index], marker_size, camera_matrix, camera_distortion)
             rvec, tvec = ret[0][0,0,:], ret[1][0,0,:]
             
 
@@ -425,9 +426,9 @@ if __name__=="__main__":
     try:
         # Inicializando - por default gira no sentido anti-horário
         vel = Twist(Vector3(0,0,0), Vector3(0,0,math.pi/10.0))
-        cor = 'blue' # input("Qual é a cor do creeper?: ")
-        id = 12   #input("Qual é o id do creeper?")
-        estacao = 'dog'  # input ("Qual é a estação que você quer levar o creeper?")
+        cor = 'green' # input("Qual é a cor do creeper?: ")
+        id = 21   #input("Qual é o id do creeper?")
+        estacao = 'horse'  # input ("Qual é a estação que você quer levar o creeper?")
 
         goal = (cor, id, estacao)
         

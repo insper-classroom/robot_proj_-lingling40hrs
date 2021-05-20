@@ -60,7 +60,7 @@ def roda_todo_frame(imagem):
 		gray = cv2.cvtColor(cv_image, cv2.COLOR_BGR2GRAY)
 		corners, ids, rejectedImgPoints = aruco.detectMarkers(gray, aruco_dict, parameters=parameters)
 		print(ids)
-
+		
 
 		if ids is not None:
 			#-- ret = [rvec, tvec, ?]
