@@ -103,7 +103,9 @@ CAVALO = 6
 CACHORRO = 7
 DIREITAMAIOR = 8
 GIROCIRCUNF = 9
-CREEPERNAMAO = 11
+ESTACAONATELA = 10
+
+CREEPERNAMAO = False
 
 ESTADO = LINHA
 
@@ -403,6 +405,7 @@ if __name__=="__main__":
     tolerancia = 25
     ANDAR = True
     PEGARCREEPER = False
+    estacaoNaTela = False
     naoChegou80Cm = True
     estacaoCentral = False
     mediax = 0
@@ -496,42 +499,47 @@ if __name__=="__main__":
                         angulo_desejado = 1000
                         ESTADO = CIRCUNF
 
-                #IR PARA ESTAÇÃOOOO TENTAR DEPOIS 
-                elif ESTADO == CREEPERNAMAO:
-                
-                    for r in resultados:
-                        print(r)
-                        print("gatoC", estacaoCentral)
-                        print("naoChegou", naoChegou80Cm)
-                        if r[0] == estacao:
-                            mediax = abs((r[2][0] + r[3][0])/2)
-                    #velocidade_saida.publish(vel)
-                    if laserDadoFrente >= 0.8 and naoChegou80Cm == True:
-                        v,w = andar(coef_angular, x_linha)
-                    elif naoChegou80Cm == False and estacaoCentral == False:
-                        v = 0.1
-                    else:   
-                        if laserDadoFrente == 0: #no começo do Frame o laser dado == 0
-                            naoChegou80Cm = True
-                        else:
-                            v = 0
-                            w = 0
-                            naoChegou80Cm = False
-                    if len(centro) != 0 and mediax != 0:
-                        if abs(centro[0] - mediax) <= 10:
-                            estacaoCentral = True
-                            if laserDadoFrente >= 1:
-                                v = 0
-                            elif laserDadoFrente < 1:
-                                v = -0.1
-                    
-                
+                elif ESTADO == ESTACAONATELA:
+                    if laserDadoCreeper <= 0.3:
+                        if tempoCreeper:
+                            tempo_inicial = rospy.get_time()
+                            tempoCreeper = False      
+                        w = 0
+                        v = 0
+
+                        ombro_publisher.publish(0.0) #para cimaa: metade
+                        tempo_final = rospy.get_time()
+                        if tempo_final - tempo_inicial >= 2.5:
+                            garra_publisher.publish(-1.0) #aberto
+
+                    elif 0.3 < laserDadoCreeper <= 0.45:
+                        w = 0
+                        v = 0.2 - 0.04/laserDadoCreeper
+                    else:
+                        erro_xEstacao = mediaxMobileNet - centro[0]
+                        w= - (erro_xEstacao/900)
+                        v= 0.4 - 0.072/laserDadoCreeper - abs(erro_xEstacao)/1500
+
+
                 if ids is not None:        
                     print("CHEQUEI")
                     if laserDadoCreeper <= 1.5 and media[0]!=0 and centro[0] !=0 and id in ids and distancenp <= 700:
                         print("ENTREI")
                         PEGARCREEPER = True
-                        ANDAR = False
+                        ANDAR = False        
+
+
+            #IR PARA ESTAÇÃOOOO TENTAR DEPOIS 
+            # # Exemplo de categoria de resultados
+            # [('chair', 86.965459585189819, (90, 141), (177, 265))]
+            if CREEPERNAMAO:
+                for r in resultados:
+                    if r[0] == estacao and r[1] >= 90:
+                        mediaxMobileNet = abs((r[2][0] + r[3][0])/2)
+                        if ESTADO != ESTACAONATELA:
+                            ESTADO = ESTACAONATELA
+                            tempoCreeper = True
+                #velocidade_saida.publish(vel)
 
             elif PEGARCREEPER:
                 if laserDadoCreeper <= 0.17:
@@ -548,10 +556,13 @@ if __name__=="__main__":
                         garra_publisher.publish(0.0) #fechado
                         if tempo_final - tempo_inicial >= 5:
                             ombro_publisher.publish(1.5)
-                            ESTADO =  CREEPERNAMAO
+                            CREEPERNAMAO = True
                             PEGARCREEPER = False
                             ANDAR = True  #volta a andar 
-                          
+
+                elif 0.17 < laserDadoCreeper <= 0.3:
+                    w = 0
+                    v = 0.2 - 0.032/laserDadoCreeper           
                 else:
                     erro_xcreeper = media[0] - centro[0]
                     w= - (erro_xcreeper/900)
