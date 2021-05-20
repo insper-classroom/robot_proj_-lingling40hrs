@@ -103,8 +103,8 @@ CAVALO = 6
 CACHORRO = 7
 DIREITAMAIOR = 8
 GIROCIRCUNF = 9
-ESTACAONATELA = 10
 
+ESTACAONATELA = False
 CREEPERNAMAO = False
 
 ESTADO = LINHA
@@ -225,15 +225,15 @@ def roda_todo_frame(imagem):
 
         if  COR == LARANJA:
             maskLaranja, media, centro, maior_area = cM.identifica_cor_laranja(temp_image)
-            cv2.imshow("Laranja", maskLaranja)
+            #cv2.imshow("Laranja", maskLaranja)
 
         if  COR == AZUL:
             maskAzul, media, centro, maior_area = cM.identifica_cor_azul(temp_image)
-            cv2.imshow("Azul", maskAzul)
+            #cv2.imshow("Azul", maskAzul)
             
         if  COR == VERDE:
             maskVerde, media, centro, maior_area = cM.identifica_cor_verde(temp_image)
-            cv2.imshow("Verde", maskVerde)
+            #cv2.imshow("Verde", maskVerde)
 
         output, coef_angular, x_linha = rl.ajuste_linear_grafico_x_fy(mask_yellow)
 
@@ -301,7 +301,7 @@ def roda_todo_frame(imagem):
 
         # Desnecessário - Hough e MobileNet já abrem janelas
         cv2.imshow("cv_image", cv_image)
-        cv2.imshow("Output", output)
+        #cv2.imshow("Output", output)
         cv2.waitKey(1)
     except CvBridgeError as e:
         print('ex', e)
@@ -413,20 +413,19 @@ if __name__=="__main__":
     try:
         # Inicializando - por default gira no sentido anti-horário
         vel = Twist(Vector3(0,0,0), Vector3(0,0,math.pi/10.0))
-        cor = 'orange' # input("Qual é a cor do creeper?: ")
-        id = 11   #input("Qual é o id do creeper?")
+        cor = 'blue' # input("Qual é a cor do creeper?: ")
+        id = 12   #input("Qual é o id do creeper?")
         estacao = 'dog'  # input ("Qual é a estação que você quer levar o creeper?")
 
         goal = (cor, id, estacao)
         
         while not rospy.is_shutdown():
-            #for r in resultados:
-                #print(r)
+            v = 0
+            w = 0 
                 
             #goal1 = ("blue", 22, "dog")
             if ANDAR:
-                v = 0
-                w = 0 
+                
                 angulo_local = angulo(angle_z)
                 if ESTADO == LINHA:
                     v,w = andar(coef_angular, x_linha)
@@ -499,50 +498,33 @@ if __name__=="__main__":
                         angulo_desejado = 1000
                         ESTADO = CIRCUNF
 
-                elif ESTADO == ESTACAONATELA:
-                    if laserDadoCreeper <= 0.3:
-                        if tempoCreeper:
-                            tempo_inicial = rospy.get_time()
-                            tempoCreeper = False      
-                        w = 0
-                        v = 0
-
-                        ombro_publisher.publish(0.0) #para cimaa: metade
-                        tempo_final = rospy.get_time()
-                        if tempo_final - tempo_inicial >= 2.5:
-                            garra_publisher.publish(-1.0) #aberto
-
-                    elif 0.3 < laserDadoCreeper <= 0.45:
-                        w = 0
-                        v = 0.2 - 0.04/laserDadoCreeper
-                    else:
-                        erro_xEstacao = mediaxMobileNet - centro[0]
-                        w= - (erro_xEstacao/900)
-                        v= 0.4 - 0.072/laserDadoCreeper - abs(erro_xEstacao)/1500
-
-
                 if ids is not None:        
-                    print("CHEQUEI")
                     if laserDadoCreeper <= 1.5 and media[0]!=0 and centro[0] !=0 and id in ids and distancenp <= 700:
-                        print("ENTREI")
                         PEGARCREEPER = True
                         ANDAR = False        
+         
+                if ids is not None:
+                    if 100 in ids and distancenp <= 300:
+                        ESTACAO = EST_BIF
+                    if 50 in ids and distancenp <= 300:
+                        ESTACAO = EST_CAV
+                    if 150 in ids and distancenp <= 300: 
+                        ESTACAO = EST_DOG
+                    if 200 in ids and distancenp <= 300:
+                        ESTACAO = EST_CIR
 
-
-            #IR PARA ESTAÇÃOOOO TENTAR DEPOIS 
-            # # Exemplo de categoria de resultados
-            # [('chair', 86.965459585189819, (90, 141), (177, 265))]
-            if CREEPERNAMAO:
-                for r in resultados:
-                    if r[0] == estacao and r[1] >= 90:
-                        mediaxMobileNet = abs((r[2][0] + r[3][0])/2)
-                        if ESTADO != ESTACAONATELA:
-                            ESTADO = ESTACAONATELA
-                            tempoCreeper = True
-                #velocidade_saida.publish(vel)
+                    if ESTACAO == EST_BIF and laserDadoFrente <= 1.8:
+                        ESTADO = DIREITA
+                    elif ESTACAO == EST_CAV and laserDadoFrente <= 1.2:
+                        ESTADO = CAVALO
+                    elif ESTACAO == EST_DOG and laserDadoFrente <= 1.2:
+                        ESTADO = CACHORRO
+                    elif ESTACAO == EST_CIR and laserDadoFrente <= 1.2:
+                        ESTADO = GIROCIRCUNF
 
             elif PEGARCREEPER:
-                if laserDadoCreeper <= 0.17:
+                erro_xcreeper = media[0] - centro[0]
+                if laserDadoCreeper <= 0.16:
                     if tempoCreeper:
                         tempo_inicial = rospy.get_time()
                         tempoCreeper = False
@@ -559,38 +541,53 @@ if __name__=="__main__":
                             CREEPERNAMAO = True
                             PEGARCREEPER = False
                             ANDAR = True  #volta a andar 
-
-                elif 0.17 < laserDadoCreeper <= 0.3:
-                    w = 0
+                elif 0.16 < laserDadoCreeper <= 0.3:
+                    w = - (erro_xcreeper/900)
                     v = 0.2 - 0.032/laserDadoCreeper           
                 else:
-                    erro_xcreeper = media[0] - centro[0]
                     w= - (erro_xcreeper/900)
                     v= 0.4 - 0.072/laserDadoCreeper - abs(erro_xcreeper)/1500
                 print('\n\n\n\n achemos O CRÉPE')  
+
+            #IR PARA ESTAÇÃOOOO TENTAR DEPOIS 
+            # # Exemplo de categoria de resultados
+            # [('chair', 86.965459585189819, (90, 141), (177, 265))]
+            if CREEPERNAMAO:
+                for r in resultados:
+                    if r[0] == estacao and r[1] >= 95:
+                        mediaxMobileNet = abs((r[2][0] + r[3][0])/2)
+                        if not ESTACAONATELA:
+                            ESTACAONATELA = True
+                            ANDAR = False
+                            tempoCreeper = True
+                #velocidade_saida.publish(vel)
+
+            elif ESTACAONATELA:
+                print("ENTREI")
+                erro_xEstacao = mediaxMobileNet - centro[0]
+                if laserDadoCreeper <= 0.3:
+                    print("PAREI")
+                    if tempoCreeper:
+                        tempo_inicial = rospy.get_time()
+                        tempoCreeper = False      
+                    w = 0
+                    v = 0
+
+                    ombro_publisher.publish(0.0) #para cimaa: metade
+                    tempo_final = rospy.get_time()
+                    if tempo_final - tempo_inicial >= 2.5:
+                        garra_publisher.publish(-1.0) #aberto
+                        ANDAR = False
+                        ESTACAONATELA = False
+                        CREEPERNAMAO = False
+
+                elif 0.3 < laserDadoCreeper <= 0.45:
+                    w = - (erro_xEstacao/900)
+                    v = 0.2 - 0.04/laserDadoCreeper
+                else:
+                    w= - (erro_xEstacao/900)
+                    v= 0.4 - 0.072/laserDadoCreeper - abs(erro_xEstacao)/1500                       
                     
-                
-
-            if ids is not None:
-                if 100 in ids:
-                    ESTACAO = EST_BIF
-                if 50 in ids:
-                    ESTACAO = EST_CAV
-                if 150 in ids: 
-                    ESTACAO = EST_DOG
-                if 200 in ids:
-                    ESTACAO = EST_CIR
-
-            if ESTACAO == EST_BIF and laserDadoFrente <= 1.8:
-                ESTADO = DIREITA
-            elif ESTACAO == EST_CAV and laserDadoFrente <= 1.2:
-                ESTADO = CAVALO
-            elif ESTACAO == EST_DOG and laserDadoFrente <= 1.2:
-                ESTADO = CACHORRO
-            elif ESTACAO == EST_CIR and laserDadoFrente <= 1.2:
-                ESTADO = GIROCIRCUNF
-
-            
             if cor == 'orange':
                 COR = LARANJA
             elif cor == 'blue':
