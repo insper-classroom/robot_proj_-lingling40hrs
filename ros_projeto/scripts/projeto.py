@@ -60,7 +60,7 @@ scan_dist = 0
 
 bridge = CvBridge()
 
-cv_image = None
+bgr = None
 media = []
 centro = []
 x = []
@@ -91,6 +91,8 @@ pula = 50
 angle_z = 0.0
 angulo_desejado = 1000
 tempoCreeper = True
+contador = 0
+rvec = 0
 
 # aqui estão todos os estados usados pelo robô.
 LINHA = 0
@@ -173,7 +175,7 @@ def angulo (angle_z):
 # A função a seguir é chamada sempre que chega um novo frame
 def roda_todo_frame(imagem):
     print("frame")
-    global cv_image
+    global bgr
     global media
     global centro
     global resultados
@@ -181,6 +183,8 @@ def roda_todo_frame(imagem):
     global x_linha
     global ids
     global distancenp
+    global contador
+    global rvec
 
     now = rospy.get_rostime()
     imgtime = imagem.header.stamp
@@ -194,24 +198,31 @@ def roda_todo_frame(imagem):
         return 
     try:
         temp_image = bridge.compressed_imgmsg_to_cv2(imagem, "bgr8")
-        centro, saida_net, resultados =  visao_module.processa(temp_image) 
-        cv_image = saida_net.copy()
-        bgr = cv_image.copy()
+        if contador % 3 == 0 or PEGARCREEPER or ESTACAONATELA:
+            gray = cv2.cvtColor(temp_image, cv2.COLOR_BGR2GRAY)
+            corners, ids, rejectedImgPoints = aruco.detectMarkers(gray, aruco_dict, parameters=parameters)
+            centro, saida_net, resultados =  visao_module.processa(temp_image) 
+            bgr = saida_net.copy()
+            contador = 0
+        else:
+            bgr = temp_image
+            ids = None
+
         hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
 
+        contador += 1
         
-        gray = cv2.cvtColor(cv_image, cv2.COLOR_BGR2GRAY)
-        corners, ids, rejectedImgPoints = aruco.detectMarkers(gray, aruco_dict, parameters=parameters)
+
         # Note que os resultados já são guardados automaticamente na variável
         # chamada resultados
               
-        for r in range(len(resultados)):
+        #for r in range(len(resultados)):
             
             # print(r) - print feito para documentar e entender
             # o resultado
-            pass
+        #    pass
 
-        mask_yellow = rl.segmenta_linha_amarela_bgr(bgr)
+        mask_yellow = rl.segmenta_linha_amarela_bgr(temp_image)
         mask_yellow = rl.morpho_limpa(mask_yellow)
 
         if ESTADO == DIREITA:
@@ -243,21 +254,22 @@ def roda_todo_frame(imagem):
             #-- tvec = [[tvec_1], [tvec_2], ...] vetor de translação
             ret = aruco.estimatePoseSingleMarkers(corners, marker_size, camera_matrix, camera_distortion)
             rvec, tvec = ret[0][0,0,:], ret[1][0,0,:]
+            
 
             #-- Desenha um retanculo e exibe Id do marker encontrado
-            aruco.drawDetectedMarkers(cv_image, corners, ids) 
-            aruco.drawAxis(cv_image, camera_matrix, camera_distortion, rvec, tvec, 1)
+            aruco.drawDetectedMarkers(temp_image, corners, ids) 
+            aruco.drawAxis(bgr, camera_matrix, camera_distortion, rvec, tvec, 1)
 
             #-- Print tvec vetor de tanslação em x y z
             str_position = "Marker x=%4.0f  y=%4.0f  z=%4.0f"%(tvec[0], tvec[1], tvec[2])
             print(str_position)
-            cv2.putText(cv_image, str_position, (0, 100), font, 1, (0, 255, 0), 1, cv2.LINE_AA)
+            cv2.putText(bgr, str_position, (0, 100), font, 1, (0, 255, 0), 1, cv2.LINE_AA)
 
             ##############----- Referencia dos Eixos------###########################
             # Linha referencia em X
-            cv2.line(cv_image, (int(cv_image.shape[1]/2),int(cv_image.shape[0]/2)), ((int(cv_image.shape[1]/2) + 50),(int(cv_image.shape[0]/2))), (0,0,255), 5) 
+            cv2.line(bgr, (int(bgr.shape[1]/2),int(bgr.shape[0]/2)), ((int(bgr.shape[1]/2) + 50),(int(bgr.shape[0]/2))), (0,0,255), 5) 
             # Linha referencia em Y
-            cv2.line(cv_image, (int(cv_image.shape[1]/2),int(cv_image.shape[0]/2)), (int(cv_image.shape[1]/2),int((cv_image.shape[0]/2 + 50))), (0,255,0), 5) 	
+            cv2.line(bgr, (int(bgr.shape[1]/2),int(bgr.shape[0]/2)), (int(bgr.shape[1]/2),int((bgr.shape[0]/2 + 50))), (0,255,0), 5) 	
             
             #####################---- Distancia Euclidiana ----#####################
             # Calcula a distancia usando apenas a matriz tvec, matriz de tanslação
@@ -268,7 +280,7 @@ def roda_todo_frame(imagem):
             #-- Print distance
             str_dist = "Dist aruco=%4.0f  dis.np=%4.0f"%(distance, distancenp)
             print(str_dist)
-            cv2.putText(cv_image, str_dist, (0, 15), font, 1, (0, 255, 0), 1, cv2.LINE_AA)
+            cv2.putText(bgr, str_dist, (0, 15), font, 1, (0, 255, 0), 1, cv2.LINE_AA)
 
             #####################---- Distancia pelo foco ----#####################
             #https://www.pyimagesearch.com/2015/01/19/find-distance-camera-objectmarker-using-python-opencv/
@@ -286,7 +298,7 @@ def roda_todo_frame(imagem):
             #-- Print distancia focal
             str_distfocal = "Dist focal=%4.0f"%(dist)
             print(str_distfocal)
-            cv2.putText(cv_image, str_distfocal, (0, 30), font, 1, (0, 255, 0), 1, cv2.LINE_AA)	
+            cv2.putText(bgr, str_distfocal, (0, 30), font, 1, (0, 255, 0), 1, cv2.LINE_AA)	
 
 
             ####################--------- desenha o cubo -----------#########################
@@ -295,12 +307,12 @@ def roda_todo_frame(imagem):
             pts = np.float32([[-m,m,m], [-m,-m,m], [m,-m,m], [m,m,m],[-m,m,0], [-m,-m,0], [m,-m,0], [m,m,0]])
             imgpts, _ = cv2.projectPoints(pts, rvec, tvec, camera_matrix, camera_distortion)
             imgpts = np.int32(imgpts).reshape(-1,2)
-            cv_image = cv2.drawContours(cv_image, [imgpts[:4]],-1,(0,0,255),4)
-            for i,j in zip(range(4),range(4,8)): cv_image = cv2.line(cv_image, tuple(imgpts[i]), tuple(imgpts[j]),(0,0,255),4);
-            cv_image = cv2.drawContours(cv_image, [imgpts[4:]],-1,(0,0,255),4)
+            bgr = cv2.drawContours(bgr, [imgpts[:4]],-1,(0,0,255),4)
+            for i,j in zip(range(4),range(4,8)): bgr = cv2.line(bgr, tuple(imgpts[i]), tuple(imgpts[j]),(0,0,255),4);
+            bgr = cv2.drawContours(bgr, [imgpts[4:]],-1,(0,0,255),4)
 
         # Desnecessário - Hough e MobileNet já abrem janelas
-        cv2.imshow("cv_image", cv_image)
+        cv2.imshow("bgr", bgr)
         #cv2.imshow("Output", output)
         cv2.waitKey(1)
     except CvBridgeError as e:
@@ -523,6 +535,9 @@ if __name__=="__main__":
                         ESTADO = GIROCIRCUNF
 
             elif PEGARCREEPER:
+
+                print(f"\n\n\n\n\n\n {rvec} \n\n\n\n")
+
                 erro_xcreeper = media[0] - centro[0]
                 if laserDadoCreeper <= 0.16:
                     if tempoCreeper:
@@ -545,6 +560,8 @@ if __name__=="__main__":
                     w = - (erro_xcreeper/900)
                     v = 0.2 - 0.032/laserDadoCreeper           
                 else:
+
+
                     w= - (erro_xcreeper/900)
                     v= 0.4 - 0.072/laserDadoCreeper - abs(erro_xcreeper)/1500
                 print('\n\n\n\n achemos O CRÉPE')  
@@ -562,16 +579,16 @@ if __name__=="__main__":
                             tempoCreeper = True
                 #velocidade_saida.publish(vel)
 
-            elif ESTACAONATELA:
-                print("ENTREI")
+            if ESTACAONATELA:
+                print("ENTREI", laserDadoCreeper)
                 erro_xEstacao = mediaxMobileNet - centro[0]
-                if laserDadoCreeper <= 0.3:
+                if laserDadoFrente <= 0.3:
                     print("PAREI")
                     if tempoCreeper:
                         tempo_inicial = rospy.get_time()
                         tempoCreeper = False      
-                    w = 0
-                    v = 0
+                        w = 0
+                        v = 0
 
                     ombro_publisher.publish(0.0) #para cimaa: metade
                     tempo_final = rospy.get_time()
@@ -581,7 +598,7 @@ if __name__=="__main__":
                         ESTACAONATELA = False
                         CREEPERNAMAO = False
 
-                elif 0.3 < laserDadoCreeper <= 0.45:
+                elif 0.3 < laserDadoFrente <= 0.45:
                     w = - (erro_xEstacao/900)
                     v = 0.2 - 0.04/laserDadoCreeper
                 else:
