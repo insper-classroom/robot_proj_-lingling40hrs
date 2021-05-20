@@ -305,7 +305,7 @@ def roda_todo_frame(imagem):
 def andar(coef_angular, x_linha):
     meio_linha = (x_linha[0] + x_linha[1])/2
     erro_x = meio_linha - 360
-    v = 0.4- abs(erro_x)/900 - 0.08/laserDadoFrente
+    v = 0.4- abs(erro_x)/900 - 0.16/laserDadoFrente
     erro_coefang = coef_angular
     w = (-erro_x/800) + (erro_coefang/160) # Valor bom para retas em erro_x = 1200 e erro_coefang/160 
     print('VELOCIDADE ANGULAR:', w)
@@ -467,24 +467,20 @@ if __name__=="__main__":
                 
                 if ids is not None:        
                     print("CHEQUEI")
-                    if laserDadoCreeper <= 1.5 and media[0]!=0 and centro[0] !=0 and id in ids:
+                    if laserDadoCreeper <= 1.5 and media[0]!=0 and centro[0] !=0 and id in ids and distancenp <= 700:
                         print("ENTREI")
                         PEGARCREEPER = True
                         ANDAR = False
 
             elif PEGARCREEPER:
-                w=0
-                v= 0.2 - 0.04/laserDadoCreeper
+                erro_xcreeper = media[0] - centro[0]
+                w= - erro_xcreeper/1800
+                v= 0.4 - 0.072/laserDadoCreeper - abs(erro_xcreeper)/1500
                 #if len(media) != 0 and len(centro) != 0 and id = 22:
                     # print("Média dos azuis: {0}, {1}".format(media[0], media[1]))
-                    # print("Centro dos azuis: {0}, {1}".format(centro[0], centro[1]))
+                    # print("Centro dos azuis: {0}, {1}".format(centro[0], centro[1])
 
-                if (media[0] > centro[0]):
-                    w = -0.05
-                if (media[0] < centro[0]):
-                    w = 0.05
-
-                if laserDadoCreeper <= 0.21:
+                if laserDadoCreeper <= 0.18:
                     w = 0
                     v = 0
                     garra_publisher.publish(-1.0) #aberto
@@ -513,7 +509,7 @@ if __name__=="__main__":
                 ESTADO = CAVALO
             elif ESTACAO == EST_DOG and laserDadoFrente <= 1.2:
                 ESTADO = CACHORRO
-            elif ESTACAO == EST_CIR and laserDadoFrente <= 0.8:
+            elif ESTACAO == EST_CIR and laserDadoFrente <= 1.2:
                 ESTADO = GIROCIRCUNF
 
             
