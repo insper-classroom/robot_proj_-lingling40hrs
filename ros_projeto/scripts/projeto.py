@@ -249,11 +249,14 @@ def roda_todo_frame(imagem):
         output, coef_angular, x_linha = rl.ajuste_linear_grafico_x_fy(mask_yellow)
 
         if ids is not None:
-            index = list(ids).index(id)
+            if id in ids:
+                index = list(ids).index(id)
+                ret = aruco.estimatePoseSingleMarkers(corners[index], marker_size, camera_matrix, camera_distortion)
+            else:
+                ret = aruco.estimatePoseSingleMarkers(corners, marker_size, camera_matrix, camera_distortion)
             #-- ret = [rvec, tvec, ?]
             #-- rvec = [[rvec_1], [rvec_2], ...] vetor de rotação
             #-- tvec = [[tvec_1], [tvec_2], ...] vetor de translação
-            ret = aruco.estimatePoseSingleMarkers(corners[index], marker_size, camera_matrix, camera_distortion)
             rvec, tvec = ret[0][0,0,:], ret[1][0,0,:]
             
 
@@ -314,7 +317,7 @@ def roda_todo_frame(imagem):
 
         # Desnecessário - Hough e MobileNet já abrem janelas
         cv2.imshow("bgr", bgr)
-        #cv2.imshow("Output", output)
+        cv2.imshow("Output", output)
         cv2.waitKey(1)
     except CvBridgeError as e:
         print('ex', e)
@@ -355,25 +358,14 @@ def giro90 (angulo_local, angulo_fin):
 
 def giro180 (angulo_local, angulo_fin):
     giroCompleto = False
-    angulo_init = angulo_fin - 180
     dif = abs(angulo_local- angulo_fin)
-    if angulo_init < 0:
-        angulo_init += 360
     v = 0
     w = 0
-    if giroCompleto == False:
-        if angulo_init > 180:
-            if dif <= 5:
-                w = 0
-                giroCompleto = True
-                return v, w, giroCompleto
-            w = -0.1
-        else:
-            if dif <= 5:
-                w = 0
-                giroCompleto = True
-                return v, w, giroCompleto
-            w = 0.1
+    if dif <= 5:
+        giroCompleto = True
+        return v, w, giroCompleto
+    w = -0.2
+    
     return v, w, giroCompleto
 
 if __name__=="__main__":
@@ -398,7 +390,7 @@ if __name__=="__main__":
         CONCEITO B:
         Itens do conceito B + um uso de classes e objetos Python
         Só pode ter sleep dentro do while principal.
-        Pegar o creeper da cor certa, com o ID certo, e deixar na base certa   CLASSES
+        Pegar o creeper da cor certa, com o ID certo, e deixar na base certa   
 
         CONCEITO A:
         Fazer um controle proporcional ou PD para manter o robô na pista e fazer funcionar rápido baseado no ângulo de visão da pista, mais ou menos como neste exemplo
@@ -419,16 +411,20 @@ if __name__=="__main__":
     ANDAR = True
     PEGARCREEPER = False
     estacaoNaTela = False
-    naoChegou80Cm = True
-    estacaoCentral = False
     mediax = 0
 
     try:
+        '''goal1 = ("blue", 22, "dog")
+
+        goal2 = ("green", 13, "car")
+
+        goal3 = ("orange", 11, "horse")'''
+
         # Inicializando - por default gira no sentido anti-horário
         vel = Twist(Vector3(0,0,0), Vector3(0,0,math.pi/10.0))
-        cor = 'green' # input("Qual é a cor do creeper?: ")
-        id = 21   #input("Qual é o id do creeper?")
-        estacao = 'horse'  # input ("Qual é a estação que você quer levar o creeper?")
+        cor = 'blue' # input("Qual é a cor do creeper?: ")
+        id = 22   #input("Qual é o id do creeper?")
+        estacao = 'car'  # input ("Qual é a estação que você quer levar o creeper?")
 
         goal = (cor, id, estacao)
         
@@ -512,7 +508,7 @@ if __name__=="__main__":
                         ESTADO = CIRCUNF
 
                 if ids is not None:        
-                    if laserDadoCreeper <= 1.5 and media[0]!=0 and centro[0] !=0 and id in ids and distancenp <= 700:
+                    if laserDadoCreeper <= 1.5 and media[0]!=0 and centro[0]!=0 and id in ids and distancenp <= 700:
                         PEGARCREEPER = True
                         ANDAR = False        
          
@@ -556,14 +552,14 @@ if __name__=="__main__":
                             ombro_publisher.publish(1.5)
                             CREEPERNAMAO = True
                             PEGARCREEPER = False
-                            ANDAR = True  #volta a andar 
+                            ANDAR = True  #volta a andar
+
+                
                 elif 0.16 < laserDadoCreeper <= 0.3:
-                    w = - (erro_xcreeper/900)
-                    v = 0.2 - 0.032/laserDadoCreeper           
+                    w = (rvec[2]/10) - (erro_xcreeper/900)
+                    v = 0.2 - 0.032/laserDadoCreeper     
                 else:
-
-
-                    w= - (erro_xcreeper/900)
+                    w = (-rvec[2]/7) - (erro_xcreeper/900)
                     v= 0.4 - 0.072/laserDadoCreeper - abs(erro_xcreeper)/1500
                 print('\n\n\n\n achemos O CRÉPE')  
 
@@ -608,9 +604,9 @@ if __name__=="__main__":
                     
             if cor == 'orange':
                 COR = LARANJA
-            elif cor == 'blue':
+            if cor == 'blue':
                 COR = AZUL
-            else:
+            if cor == 'green':
                 COR = VERDE
 
 
