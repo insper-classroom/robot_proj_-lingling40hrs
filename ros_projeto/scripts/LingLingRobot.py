@@ -125,3 +125,15 @@ class Lingling:
                 self.w = 0.1
         return self.v, -self.w, giroCompleto
                 
+    
+    def giro180 (self, angulo_local, angulo_fin):
+        giroCompleto = False
+        dif = abs(angulo_local- angulo_fin)
+        self.v = 0
+        self.w = 0
+        if dif <= 5:
+            giroCompleto = True
+            return self.v, self.w, giroCompleto
+        self.w = -0.2
+        
+        return self.v, self.w, giroCompleto

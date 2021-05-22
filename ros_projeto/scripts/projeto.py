@@ -32,69 +32,86 @@ import regressaoLinear as rl
 import corModule as cM
 import cv2.aruco as aruco
 
-#--- Define Tag de teste
+#---------------------------Parâmetros do aruco--------------------------------
+
 id_to_find  = 200
-marker_size  = 20 #- [cm]
-#id_to_find  = 22
-#marker_size  = 3 #- [cm]
-# 
+marker_size  = 20 #[cm]
 
 
-#--- Get the camera calibration path
+#Get the camera calibration path
+
 calib_path  = "/home/borg/catkin_ws/src/robot202/ros/exemplos202/scripts/"
 camera_matrix   = np.loadtxt(calib_path+'cameraMatrix_raspi.txt', delimiter=',')
 camera_distortion   = np.loadtxt(calib_path+'cameraDistortion_raspi.txt', delimiter=',')
 
-#--- Define the aruco dictionary
+
+#Define the aruco dictionar
+
 aruco_dict  = aruco.getPredefinedDictionary(aruco.DICT_6X6_250)
 parameters  = aruco.DetectorParameters_create()
 parameters.minDistanceToBorder = 0
 parameters.adaptiveThreshWinSizeMax = 1000
 
-#-- Font for the text in the image
-font = cv2.FONT_HERSHEY_PLAIN
 
+#Font for the text in the image
+
+font = cv2.FONT_HERSHEY_PLAIN
 scan_dist = 0
 
-
-
 bridge = CvBridge()
+
+#-------------------------Variáveis de posicionamento-------------------------
 
 bgr = None
 media = []
 centro = []
-x = []
 ids=[]
-atraso = 1.5E9 # 1 segundo e meio. Em nanossegundos
+atraso = 1.5E9 #1 segundo e meio, em nanossegundos
 
+#Variavel com a área do maior contorno
 
-area = 0.0 # Variavel com a area do maior contorno
+area = 0.0
 
-# Só usar se os relógios ROS da Raspberry e do Linux desktop estiverem sincronizados. 
-# Descarta imagens que chegam atrasadas demais
+#Só usar se os relógios ROS da Raspberry e do Linux desktop estiverem sincronizados. 
+#Descarta imagens que chegam atrasadas demais
+
 check_delay = False 
 
-resultados = [] # Criacao de uma variavel global para guardar os resultados vistos
+resultados = [] #Criação de uma variável global para guardar os resultados vistos
+
+#---------------------------Variáveis da odometria--------------------------
 
 x = 0
 y = 0
 z = 0 
-id = 0
-x_linha = [0,0]
+angle_z = 0.0
+contador = 0
+pula = 50
+
+#-----------------------------Variáveis do laser---------------------------
+
 coef_angular = 0
 laserDadoSairCentro = 10.0
 laserDadoFrente = 10.0
 laserDadoCreeper = 10.0
+
+#----------------------------Variáveis do Aruco----------------------------
+
 distancenp = 0
-contador = 0
-pula = 50
-angle_z = 0.0
-angulo_desejado = 1000
-tempoCreeper = True
-contador = 0
+id = 0
 rvec = 0
 
-# aqui estão todos os estados usados pelo robô.
+#----------------Lista das abcissas da linha da regressão linear---------------
+
+x_linha = [0,0]
+
+#---------------------------------Variáveis miscs------------------------------
+
+angulo_desejado = 1000
+contadorFrame = 0
+
+#------------------------------Estados do robô---------------------------------
+
 LINHA = 0
 CIRCUNF = 1
 DIREITA = 2
@@ -105,16 +122,20 @@ CAVALO = 6
 CACHORRO = 7
 DIREITAMAIOR = 8
 GIROCIRCUNF = 9
+ESTADO = LINHA
 
 ESTACAONATELA = False
 CREEPERNAMAO = False
+tempoCreeper = True
 
-ESTADO = LINHA
+#------------------------------Estados de cores-------------------------------
 
 COR = None
 LARANJA = 20
 VERDE = 21
 AZUL = 22
+
+#-----------------------------Estados de estações-----------------------------
 
 ESTACAO = 0
 EST_BIF = 51
@@ -122,17 +143,15 @@ EST_CAV = 52
 EST_DOG = 53
 EST_CIR = 54
 
+#-----------------------------------------------------------------------------------------------
+
 frame = "camera_link"
-# frame = "head_camera"  # DESCOMENTE para usar com webcam USB via roslaunch tag_tracking usbcam
-
 tfl = 0
-
 tf_buffer = tf2_ros.Buffer()
 
+#----------Função que utiliza o laser para conferir as distâncias de diferentes ângulos---------
+
 def scaneou(dado):
-    #print("Faixa valida: ", dado.range_min , " - ", dado.range_max )
-    #print("Leituras:")
-    #print(np.array(dado.ranges).round(decimals=2))
     global laserDadoSairCentro
     global laserDadoCreeper
     global laserDadoFrente
@@ -141,10 +160,10 @@ def scaneou(dado):
     laser0to15 = np.min(dado.ranges[0:45])
     laser345to360 = np.min(dado.ranges[315:360])
     listaMinimosLaser = [laser0to15, laser345to360]
-    laserDadoCreeper = np.min(listaMinimosLaser)
-    print(f'\n\n\n\n\n {laserDadoCreeper}')    
-    #print("Intensities")
-    #print(np.array(dado.intensities).round(decimals=2))
+    laserDadoCreeper = np.min(listaMinimosLaser)    
+
+
+#----Função responsável por aplicar a odometria e saber a posição do robô e seu ângulo---------
 
 def recebe_odometria(data):
     global x
@@ -166,13 +185,16 @@ def recebe_odometria(data):
         print(angle_z)
     contador = contador + 1
 
+#--------------------Função que define o ângulo z----------------------
+
 def angulo (angle_z):
     angle_deg = math.degrees(angle_z)
     if angle_deg < 0:
         angle_deg = angle_deg + 360.00
     return angle_deg
 
-# A função a seguir é chamada sempre que chega um novo frame
+#-----------------Função que roda em todo frame------------------------
+
 def roda_todo_frame(imagem):
     print("frame")
     global bgr
@@ -183,45 +205,40 @@ def roda_todo_frame(imagem):
     global x_linha
     global ids
     global distancenp
-    global contador
+    global contadorFrame
     global rvec
 
     now = rospy.get_rostime()
     imgtime = imagem.header.stamp
     lag = now-imgtime # calcula o lag
     delay = lag.nsecs
-    # print("delay ", "{:.3f}".format(delay/1.0E9))
+
     if delay > atraso and check_delay==True:
-        # Esta logica do delay so' precisa ser usada com robo real e rede wifi 
-        # serve para descartar imagens antigas
+        # Esta lógica do delay só precisa ser usada com robo real e rede wifi e serve para descartar imagens antigas
         print("Descartando por causa do delay do frame:", delay)
         return 
     try:
         temp_image = bridge.compressed_imgmsg_to_cv2(imagem, "bgr8")
-        if contador % 3 == 0 or PEGARCREEPER or ESTACAONATELA:
+        if contadorFrame % 3 == 0 or PEGARCREEPER or ESTACAONATELA:
             gray = cv2.cvtColor(temp_image, cv2.COLOR_BGR2GRAY)
             corners, ids, rejectedImgPoints = aruco.detectMarkers(gray, aruco_dict, parameters=parameters)
-            centro, saida_net, resultados =  visao_module.processa(temp_image) 
+            centro, saida_net, resultados =  visao_module.processa(temp_image)
+
+            #Exemplo de categoria de resultados (MobileNet)
+            # [('chair', 86.965459585189819, (90, 141), (177, 265))]
+            
             bgr = saida_net.copy()
-            contador = 0
+            contadorFrame = 0
         else:
             bgr = temp_image
             ids = None
 
         hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
 
-        contador += 1
+        contadorFrame += 1
+
+        #Aqui é onde se conferem os estados do robô para aplicar as máscaras na pista que manterão ele seguindo a linha amarela:
         
-
-        # Note que os resultados já são guardados automaticamente na variável
-        # chamada resultados
-              
-        #for r in range(len(resultados)):
-            
-            # print(r) - print feito para documentar e entender
-            # o resultado
-        #    pass
-
         mask_yellow = rl.segmenta_linha_amarela_bgr(temp_image)
         mask_yellow = rl.morpho_limpa(mask_yellow)
 
@@ -236,18 +253,16 @@ def roda_todo_frame(imagem):
 
         if  COR == LARANJA:
             maskLaranja, media, centro, maior_area = cM.identifica_cor_laranja(temp_image)
-            #cv2.imshow("Laranja", maskLaranja)
 
         if  COR == AZUL:
             maskAzul, media, centro, maior_area = cM.identifica_cor_azul(temp_image)
-            #cv2.imshow("Azul", maskAzul)
             
         if  COR == VERDE:
             maskVerde, media, centro, maior_area = cM.identifica_cor_verde(temp_image)
-            #cv2.imshow("Verde", maskVerde)
 
         output, coef_angular, x_linha = rl.ajuste_linear_grafico_x_fy(mask_yellow)
 
+        
         if ids is not None:
             if id in ids:
                 index = list(ids).index(id)
@@ -328,8 +343,7 @@ def andar(coef_angular, x_linha):
     erro_x = meio_linha - 360
     v = 0.4- abs(erro_x)/900 - 0.16/laserDadoFrente
     erro_coefang = coef_angular
-    w = (-erro_x/800) + (erro_coefang/160) # Valor bom para retas em erro_x = 1200 e erro_coefang/160 
-    print('VELOCIDADE ANGULAR:', w)
+    w = (-erro_x/800) + (erro_coefang/160) 
 
     return v,w
 
@@ -378,7 +392,7 @@ if __name__=="__main__":
     '''
         Antes de iniciar o programa é necessário rodar
         roslaunch mybot_description mybot_control2.launch
-        para fazer a garra funfar
+        para fazer a garra funcionar
     '''
 
 
@@ -406,12 +420,10 @@ if __name__=="__main__":
 
     velocidade_saida = rospy.Publisher("/cmd_vel", Twist, queue_size = 1)
 
-    tfl = tf2_ros.TransformListener(tf_buffer) #conversao do sistema de coordenadas 
-    tolerancia = 25
+    tfl = tf2_ros.TransformListener(tf_buffer) #Conversão do sistema de coordenadas 
     ANDAR = True
     PEGARCREEPER = False
     estacaoNaTela = False
-    mediax = 0
 
     try:
         '''goal1 = ("blue", 22, "dog")
@@ -422,10 +434,10 @@ if __name__=="__main__":
 
         # Inicializando - por default gira no sentido anti-horário
         vel = Twist(Vector3(0,0,0), Vector3(0,0,math.pi/10.0))
-        cor = 'blue' # input("Qual é a cor do creeper?: ")
-        id = 22   #input("Qual é o id do creeper?")
-        estacao = 'car'  # input ("Qual é a estação que você quer levar o creeper?")
-
+        cor = 'orange' # Qual é a cor do creeper?
+        id = 11   # Qual o id do creeper?
+        estacao = 'horse' # Qual é a estação que você quer levar o creeper?
+        
         goal = (cor, id, estacao)
         
         while not rospy.is_shutdown():
@@ -508,7 +520,7 @@ if __name__=="__main__":
                         ESTADO = CIRCUNF
 
                 if ids is not None:        
-                    if laserDadoCreeper <= 1.5 and media[0]!=0 and centro[0]!=0 and id in ids and distancenp <= 700:
+                    if laserDadoCreeper <= 1.5 and media[0]!=0 and centro[0]!=0 and id in ids and distancenp <= 800:
                         PEGARCREEPER = True
                         ANDAR = False        
          
@@ -533,8 +545,6 @@ if __name__=="__main__":
 
             elif PEGARCREEPER:
 
-                print(f"\n\n\n\n\n\n {rvec} \n\n\n\n")
-
                 erro_xcreeper = media[0] - centro[0]
                 if laserDadoCreeper <= 0.16:
                     if tempoCreeper:
@@ -544,7 +554,7 @@ if __name__=="__main__":
                     w = 0
                     v = 0
                     garra_publisher.publish(-1.0) #aberto
-                    ombro_publisher.publish(0.0) #para cimaa: metade
+                    ombro_publisher.publish(0.0) #para cima: metade
                     tempo_final = rospy.get_time()
                     if tempo_final - tempo_inicial >= 2.5:
                         garra_publisher.publish(0.0) #fechado
@@ -559,13 +569,10 @@ if __name__=="__main__":
                     w = (rvec[2]/10) - (erro_xcreeper/900)
                     v = 0.2 - 0.032/laserDadoCreeper     
                 else:
-                    w = (-rvec[2]/7) - (erro_xcreeper/900)
+                    w = (-rvec[2]/10) - (erro_xcreeper/900)
                     v= 0.4 - 0.072/laserDadoCreeper - abs(erro_xcreeper)/1500
-                print('\n\n\n\n achemos O CRÉPE')  
 
-            #IR PARA ESTAÇÃOOOO TENTAR DEPOIS 
-            # # Exemplo de categoria de resultados
-            # [('chair', 86.965459585189819, (90, 141), (177, 265))]
+            
             if CREEPERNAMAO:
                 for r in resultados:
                     if r[0] == estacao and r[1] >= 95:
@@ -574,7 +581,6 @@ if __name__=="__main__":
                             ESTACAONATELA = True
                             ANDAR = False
                             tempoCreeper = True
-                #velocidade_saida.publish(vel)
 
             if ESTACAONATELA:
                 print("ENTREI", laserDadoCreeper)
@@ -587,7 +593,7 @@ if __name__=="__main__":
                         w = 0
                         v = 0
 
-                    ombro_publisher.publish(0.0) #para cimaa: metade
+                    ombro_publisher.publish(0.0) #para cima: metade
                     tempo_final = rospy.get_time()
                     if tempo_final - tempo_inicial >= 2.5:
                         garra_publisher.publish(-1.0) #aberto
@@ -609,9 +615,6 @@ if __name__=="__main__":
             if cor == 'green':
                 COR = VERDE
 
-
-            #print("Vel lin :{0}".format(v))
-            #print("Vel ang: {0}".format(w))
             print (ESTADO)
             vel = Twist(Vector3(v,0,0), Vector3(0,0,w))
             velocidade_saida.publish(vel)
