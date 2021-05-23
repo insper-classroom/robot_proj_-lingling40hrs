@@ -527,11 +527,11 @@ if __name__=="__main__":
                 if ids is not None:
                     if 100 in ids and distancenp <= 300:
                         ESTACAO = EST_BIF
-                    if 50 in ids and distancenp <= 300:
+                    if 50 in ids and distancenp  <= 300:
                         ESTACAO = EST_CAV
                     if 150 in ids and distancenp <= 300: 
                         ESTACAO = EST_DOG
-                    if 200 in ids and distancenp <= 300:
+                    if 200 in ids and distancenp <= 500:
                         ESTACAO = EST_CIR
 
                     if ESTACAO == EST_BIF and laserDadoFrente <= 1.8:
