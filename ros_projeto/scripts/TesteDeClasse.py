@@ -25,3 +25,4 @@ try:
         rospy.sleep(0.1)
 except rospy.ROSInterruptException:
         print("Ocorreu uma exceção com o rospy")
+        
