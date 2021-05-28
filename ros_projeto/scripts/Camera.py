@@ -125,7 +125,7 @@ class Camera:
             return 
         try:
             temp_image = bridge.compressed_imgmsg_to_cv2(imagem, "bgr8") 
-            if self.contadorFrame % 3 == 0 or self.PEGACREEPER or self.OBJETIVONATELA:
+            if self.contadorFrame % 3 == 0 or self.PEGACREEPER or self.OBJETIVONATELA or self.CREEPERNAMAO:
                 self.gray = cv2.cvtColor(temp_image, cv2.COLOR_BGR2GRAY)
                 self.corners, self.ids, self.rejectedImgPoints = aruco.detectMarkers(self.gray, aruco_dict, parameters=parameters)
                 self.centro, self.saida_net, self.resultados =  visao_module.processa(temp_image)

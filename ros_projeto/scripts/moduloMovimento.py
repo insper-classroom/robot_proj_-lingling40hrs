@@ -39,7 +39,7 @@ def giro180 (angulo_local, angulo_fin):
     dif = abs(angulo_local- angulo_fin)
     v = 0
     w = 0
-    if dif <= 5:
+    if dif <= 10:
         giroCompleto = True
         return v, w, giroCompleto
     w = -0.2

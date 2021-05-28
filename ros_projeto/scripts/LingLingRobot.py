@@ -19,7 +19,7 @@ class Lingling:
         rospy.init_node("robô") 
 
         self.cor = cor 
-        self.id = id 
+        self.id = [id] 
         self.objetivo = objetivo
 
         self.estadoDic = {
@@ -56,10 +56,11 @@ class Lingling:
         self.laserDadoFrente = 10
         self.laserDadoSairCentro = 10
         self.laserDadoCreeper = 10
+        self.tempoCreeper = True   
 
         self.subCamera = rospy.Subscriber("Camera",String,self.callbackCamera)
         self.subLaser = rospy.Subscriber("DadosLaser", String,self.callbackLaser)
-        self.subOdo = rospy.Subscriber("Angulo",Float64,self.callbackOdo)
+        self.subOdo = rospy.Subscriber("Angulo",String,self.callbackOdo)
 
         ombro_publisher = rospy.Publisher("/joint1_position_controller/command", Float64, queue_size=1)
         tf_buffer = tf2_ros.Buffer()
@@ -140,27 +141,23 @@ class Lingling:
                         self.ESTADO = "GIRO90"
 
                 elif self.ESTADO == "GIROCIRCUNF":
-                    if angulo_desejado == 1000:
-                        angulo_desejado = self.angulo_local - 45.00
-                        if angulo_desejado > 360:
-                            angulo_desejado -= 360
-                        if angulo_desejado < 0:
-                            angulo_desejado += 360
-                    v, w, completaGiro = mv.giro90(self.angulo_local, angulo_desejado)
+                    if self.angulo_desejado == 1000:
+                        self.angulo_desejado = self.angulo_local - 45.00
+                        if self.angulo_desejado > 360:
+                            self.angulo_desejado -= 360
+                        if self.angulo_desejado < 0:
+                            self.angulo_desejado += 360
+                    v, w, completaGiro = mv.giro90(self.angulo_local, self.angulo_desejado)
                     if completaGiro == True:
-                        angulo_desejado = 1000
+                        self.angulo_desejado = 1000
                         self.ESTADO = "CIRCUNF"
 
-                if self.ids is not None and self.media is not None:        
+                if self.ids is not None and self.media is not None:
                     if self.laserDadoCreeper <= 1.5 and self.media[0]!=0 and self.centro[0]!=0 and self.id in self.ids and self.distancianp <= 800:
                         self.PEGACREEPER = True
                         self.ANDAR = False        
          
                 if self.ids is not None:
-
-                    if [100] in self.ids:
-                        print("--------------------ISSO TA FUNFANDO----------------")
-
                     if [100] in self.ids and self.distancianp <= 300:
                         self.ESTACAO = "EST_BIF"
                     if [50] in self.ids and self.distancianp  <= 300:
@@ -181,7 +178,7 @@ class Lingling:
 
             elif self.PEGACREEPER:
 
-                erro_xcreeper = self.media[0] - self.centro[0]
+                self.erro_xcreeper = self.media[0] - self.centro[0]
                 if self.laserDadoCreeper <= 0.16:
                     if self.tempoCreeper:
                         self.tempo_inicial = rospy.get_time()
@@ -211,7 +208,8 @@ class Lingling:
             
             if self.CREEPERNAMAO:
                 for r in self.resultados:
-                    if r[0] == self.estacao and r[1] >= 95:
+                    if r[0] == self.objetivo and r[1] >= 95:
+                        print("-------------------------TO INO PRA ESTACAO-----------------")
                         self.mediaxMobileNet = abs((r[2][0] + r[3][0])/2)
                         if not self.OBJETIVONATELA:
                             self.OBJETIVONATELA = True
@@ -258,6 +256,8 @@ class Lingling:
 
             print (self.ESTADO)
             print(self.ESTACAO)
+            print(f'OBJETIVO NA TELA: {self.OBJETIVONATELA}')
+            print(f'CREEPER NA MAO: {self.CREEPERNAMAO}\n\n\n')
             #print(f'\n\ndistancai:{self.distancianp} & laser:{self.laserDadoFrente}\n\n')
             vel = Twist(Vector3(v,0,0), Vector3(0,0,w))
             self.velocidade_saida.publish(vel)
@@ -269,7 +269,7 @@ class Lingling:
         # conversao json (lembrar do .data)
         self.dicCamera = json.loads(dicCamera.data)
 
-        print(f'\n\n\n{self.dicCamera}\n{dicCamera.data}\n\n\n')
+        print(f'\n\n\n{self.dicCamera}\n\n\n')
         self.coef_angular = self.dicCamera['coef_angular']
         self.x_linha = self.dicCamera['x_linha']
         self.ids = self.dicCamera['ids']
@@ -290,7 +290,7 @@ class Lingling:
 
     def callbackOdo(self, angle_z):
         self.dicOdo = json.loads(angle_z.data)
-        self.angulo_local = angle_z
+        self.angulo_local = self.dicOdo
 
 
 
@@ -330,7 +330,7 @@ def main(args):
 
   ''' FUNCAO QUE DEFINE OS OBJETIVOS'''
 
-  ling = Lingling("blue", 22, "cow") # ========>>>>> MUDAR AQUI
+  ling = Lingling("blue", 22, "car") # ========>>>>> MUDAR AQUI
 
 
   try:
