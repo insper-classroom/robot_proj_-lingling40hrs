@@ -34,9 +34,6 @@ class LaserDado:
         self.dicionarioDados["laserDadoSairCentro"] = self.laserDadoSairCentro
         self.dicionarioDados["laserDadoCreeper"] = self.laserDadoCreeper
         self.dictJson = json.dumps(self.dicionarioDados)
-        print(self.dictJson,type(self.dictJson))
-        print("DICT", self.dicionarioDados)
-        self.hello = "hello, I am here"
         self.pubDadosLaser.publish(self.dictJson)
 
 def main(args):

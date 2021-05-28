@@ -12,7 +12,7 @@ def morpho_limpa(mask):
 def segmenta_linha_amarela_bgr(bgr):
     """ REturns a mask within the range"""
 
-    low_yellow = (20, 50, 50)
+    low_yellow = (20, 150, 150)
     high_yellow = (45, 255, 255)
 
     hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
