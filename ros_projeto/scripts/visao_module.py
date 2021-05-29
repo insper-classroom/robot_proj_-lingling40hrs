@@ -4,12 +4,8 @@
 from __future__ import division, print_function
 
 
-import rospy
 import numpy as np
-import tf
-import math
 import cv2
-import time
 from geometry_msgs.msg import Twist, Vector3, Pose
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import Image, CompressedImage
