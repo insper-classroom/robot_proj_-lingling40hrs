@@ -2,6 +2,7 @@
 
 Nome do grupo: 
 
+LingLing40hrs
 ____________
 
 Nome dos integrantes: 
